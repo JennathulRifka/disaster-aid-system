@@ -1,0 +1,68 @@
+name: CI
+
+# Runs on every push and pull request against main. This project has no
+# automated test suite yet (see CLAUDE.md), so this pipeline verifies the one
+# thing that actually matters pre-deployment: every sub-project (server, web,
+# mobile) installs cleanly and compiles/builds without errors. No secrets or
+# real Firebase/API credentials are needed for any of these checks — nothing
+# here actually starts the server or runs the app against live data.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  server:
+    name: Server (syntax check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+      - name: Syntax-check every source file
+        working-directory: server
+        run: find src -name "*.js" -print0 | xargs -0 -n1 node --check
+
+  web:
+    name: Web (type-check + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+      - name: Type-check
+        working-directory: web
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: web
+        run: npm run build
+
+  mobile:
+    name: Mobile (type-check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --legacy-peer-deps
+      - name: Type-check
+        working-directory: mobile
+        run: npx tsc --noEmit

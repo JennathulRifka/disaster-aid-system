@@ -91,6 +91,8 @@ interface Earthquake {
   depthKm: number | null;
   tsunami: boolean;
   url: string;
+  lat: number;
+  lng: number;
 }
 
 function magnitudeColor(mag: number): string {
