@@ -1,0 +1,136 @@
+rules_version = '2';
+
+// The frontend now reads several collections DIRECTLY via the Firestore
+// client SDK (onSnapshot, for live admin dashboards + the emergency banner —
+// see EmergencyBanner.tsx, AdminRequests.tsx, AdminDonations.tsx). That makes
+// these rules load-bearing, not just a safety net — they are the only thing
+// standing between a signed-in victim/donor and the raw aidRequests/donations
+// collections (which include victimNic/victimHomeAddress) once deployed.
+// Writes still go exclusively through the Express API, which is why every
+// `allow update`/`allow create` below stays admin-only or owner-only even
+// where the corresponding read is wider.
+//
+// Deploy with: firebase deploy --only firestore:rules
+// (after installing Firebase CLI: npm install -g firebase-tools)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Users can read/write only their own profile document.
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Aid requests: victims can create/read their own; admins can read/write all.
+    match /aidRequests/{requestId} {
+      allow create: if isSignedIn() && userRole() == "victim";
+      allow read: if isSignedIn() &&
+                    (resource.data.victimId == request.auth.uid || userRole() == "admin");
+      allow update: if isSignedIn() && userRole() == "admin";
+    }
+
+    // Donations: donors can create/read their own; admins can read/write all.
+    match /donations/{donationId} {
+      allow create: if isSignedIn() && userRole() == "donor";
+      allow read: if isSignedIn() &&
+                    (resource.data.donorId == request.auth.uid || userRole() == "admin");
+      allow update: if isSignedIn() && userRole() == "admin";
+    }
+
+    // Deliveries: volunteers can read/update their own; the donor of a
+    // self-delivery can read/update it; admins can read/write all;
+    // victims can read (to confirm) the delivery tied to their request.
+    function isOwningDonor() {
+      return get(/databases/$(database)/documents/donations/$(resource.data.donationId)).data.donorId == request.auth.uid;
+    }
+
+    match /deliveries/{deliveryId} {
+      allow create: if isSignedIn() && userRole() == "admin";
+      allow read: if isSignedIn() &&
+                    (resource.data.volunteerId == request.auth.uid || userRole() in ["admin", "victim"] || isOwningDonor());
+      allow update: if isSignedIn() &&
+                      (resource.data.volunteerId == request.auth.uid || userRole() == "admin" || isOwningDonor());
+    }
+
+    // Emergency broadcast banner: deliberately public — it's shown on the
+    // logged-out landing page too, and contains no PII (see broadcasts.js).
+    // Only admins can post/clear one.
+    match /broadcasts/{broadcastId} {
+      allow read: if true;
+      allow write: if isSignedIn() && userRole() == "admin";
+    }
+
+    // Category limits: every signed-in role needs to read these to build the
+    // request/donation forms (see categories.js); only admins can change them.
+    match /categoryLimits/{categoryKey} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && userRole() == "admin";
+    }
+
+    // Internal case notes: admin-only in both directions — this is an
+    // admin-to-admin handoff log, not victim/donor-facing.
+    match /caseNotes/{noteId} {
+      allow read, write: if isSignedIn() && userRole() == "admin";
+    }
+
+    // Active-emergency districts: deliberately public, same reasoning as
+    // broadcasts — the public landing/severity-map banner and the victim
+    // request form's soft "no declared emergency in your area" note both
+    // read this directly. No PII (just a district name + admin identity).
+    // Only admins can activate/deactivate a district.
+    match /activeDistricts/{districtId} {
+      allow read: if true;
+      allow write: if isSignedIn() && userRole() == "admin";
+    }
+
+    // SOS/rescue reports: life-safety emergencies, deliberately separate
+    // from aidRequests. The reporter needs a live status listener
+    // (SosStatusBanner.tsx) and admins need a live dispatch board
+    // (AdminSos.tsx) — both read this collection directly via onSnapshot,
+    // so this rule is load-bearing, not just a safety net. Any signed-in
+    // role can create one (not just "victim" — someone could be reporting
+    // on behalf of another person); only the reporter or an admin can read
+    // it; only admins can update status.
+    match /sosRequests/{sosId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() &&
+                    (resource.data.reporterId == request.auth.uid || userRole() == "admin");
+      allow update: if isSignedIn() && userRole() == "admin";
+    }
+
+    // Delivery chats + messages: the donor/volunteer/victim pair actually
+    // linked for a given delivery (see server/src/utils/deliveryChats.js —
+    // one chat per pair, e.g. donor<->volunteer, not a three-way room).
+    // ChatModal.tsx needs a live listener on both the chat doc itself
+    // (status/consent state) and its messages, so these rules are
+    // load-bearing, not just a safety net. All writes go through the chats
+    // API (server/src/routes/chats.js) so business rules (locked chats,
+    // mutual consent, the message-length cap) stay in one place — direct
+    // client writes are blocked for every role, including admin (Admin SDK
+    // bypasses rules entirely, so admin still writes fine via the API).
+    function isChatParticipant(chatData) {
+      return request.auth.uid == chatData.partyAId || request.auth.uid == chatData.partyBId;
+    }
+
+    match /deliveryChats/{chatId} {
+      allow read: if isSignedIn() && (isChatParticipant(resource.data) || userRole() == "admin");
+      allow write: if false;
+    }
+
+    match /chatMessages/{messageId} {
+      allow read: if isSignedIn() &&
+                    (isChatParticipant(get(/databases/$(database)/documents/deliveryChats/$(resource.data.chatId)).data) ||
+                     userRole() == "admin");
+      allow write: if false;
+    }
+  }
+}
