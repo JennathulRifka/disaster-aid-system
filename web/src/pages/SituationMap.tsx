@@ -1,9 +1,12 @@
 import { Fragment, useEffect, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Polygon, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, GeoJSON, Polygon, Popup, useMap } from "react-leaflet";
+import { geoJSON as leafletGeoJSON } from "leaflet";
 import "@/lib/leafletIcons";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { apiFetch } from "@/lib/api";
 import { DISTRICTS } from "@/lib/districts";
+import { CountrySearchBox, type CountryFeature } from "@/components/CountrySearchBox";
+import { DistrictSearchBox, type DistrictOption } from "@/components/DistrictSearchBox";
 
 interface AidRequest {
   id: string;
@@ -196,6 +199,46 @@ function ReservoirListItem({ r }: { r: Reservoir }) {
   );
 }
 
+interface FloodRiskDistrict {
+  district: string;
+  lat: number;
+  lng: number;
+  month: number;
+  probability: number;
+  riskLevel: "low" | "moderate" | "elevated" | "high";
+  basis: {
+    projectedMonthRainfallMm: number;
+    prior30dRainfallMm: number;
+    historicalMonthFloodRate: number | null;
+  };
+  error?: boolean;
+}
+
+interface FloodRiskModelMeta {
+  trainedAt: string;
+  trainingWindow: { startYear: number; endYear: number };
+  topDecilePrecision: number;
+  baseRate: number;
+  sources: string[];
+}
+
+// Same worse-is-redder gradient as SEVERITY_COLOR/AREA_LEVEL_COLOR above,
+// re-keyed to the flood risk model's own 4 output levels (see server/src/
+// utils/floodPrediction.js's RISK_LEVELS thresholds).
+const FLOOD_RISK_COLOR: Record<string, string> = {
+  low: "#16a34a",
+  moderate: "#f59e0b",
+  elevated: "#f97316",
+  high: "#dc2626",
+};
+
+const FLOOD_RISK_LABEL: Record<string, string> = {
+  low: "Low risk",
+  moderate: "Moderate risk",
+  elevated: "Elevated risk",
+  high: "High risk",
+};
+
 const COMMUNITY_REPORT_TYPE_LABEL: Record<string, string> = {
   road_closure: "Road closure",
   water_level: "Water level / flooding",
@@ -208,20 +251,53 @@ const EARTHQUAKE_MAGNITUDE_LEGEND: [string, string][] = [
   ["M 4.0–4.9", "#6b7280"],
 ];
 
+// The 5 Sri-Lanka-focused tabs a district search applies to — distinct from
+// "gdacs"/"earthquakes", which search countries instead (a different data
+// domain, see CountrySearchBox.tsx).
+const LOCAL_DISTRICT_TABS: ViewMode[] = ["requests", "areas", "gauges", "reservoirs", "floodRisk"];
+
 // react-leaflet's MapContainer only sets center/zoom on first mount — this
 // recenters the existing map instance when the admin switches to the
 // earthquakes tab in "regional" scope, since those events are hundreds of km
 // outside the zoom-8 Sri-Lanka-only view every other tab (and the "sri-lanka"
 // scope, which queries a box roughly matching that same view) uses.
-function MapViewController({ viewMode, earthquakeScope }: { viewMode: ViewMode; earthquakeScope: "sri-lanka" | "regional" }) {
+function MapViewController({
+  viewMode,
+  earthquakeScope,
+  selectedCountry,
+  selectedDistrict,
+}: {
+  viewMode: ViewMode;
+  earthquakeScope: "sri-lanka" | "regional";
+  selectedCountry: CountryFeature | null;
+  selectedDistrict: DistrictOption | null;
+}) {
   const map = useMap();
   useEffect(() => {
+    // A searched country takes priority over the tab's own default view —
+    // that's the whole point of the search (CountrySearchBox.tsx): jump
+    // straight to wherever the admin just looked up, regardless of scope.
+    if (selectedCountry && (viewMode === "gdacs" || viewMode === "earthquakes")) {
+      const bounds = leafletGeoJSON(selectedCountry as any).getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [24, 24] });
+        return;
+      }
+    }
+    // Same priority for a searched district on the local tabs — zoom to its
+    // centroid (this page only has centroid data for districts, not real
+    // boundary polygons like the public map's "Areas Affected" tab, so this
+    // is a fixed zoom rather than a fitBounds).
+    if (selectedDistrict && LOCAL_DISTRICT_TABS.includes(viewMode)) {
+      map.setView([selectedDistrict.lat, selectedDistrict.lng], 10);
+      return;
+    }
     if (viewMode === "earthquakes" && earthquakeScope === "regional") {
       map.setView([8, 87], 5);
     } else {
       map.setView(SRI_LANKA_CENTER, 8);
     }
-  }, [viewMode, earthquakeScope, map]);
+  }, [viewMode, earthquakeScope, selectedCountry, selectedDistrict, map]);
   return null;
 }
 
@@ -270,7 +346,7 @@ const GAUGE_STATUS_LABEL: Record<string, string> = {
 const DONATION_COLOR = "#2563eb";
 const SRI_LANKA_CENTER: [number, number] = [7.8731, 80.7718];
 
-type ViewMode = "requests" | "areas" | "gauges" | "reservoirs" | "gdacs" | "earthquakes";
+type ViewMode = "requests" | "areas" | "gauges" | "reservoirs" | "floodRisk" | "gdacs" | "earthquakes";
 
 export default function SituationMap() {
   const [viewMode, setViewMode] = useState<ViewMode>("requests");
@@ -285,9 +361,20 @@ export default function SituationMap() {
   const [earthquakes, setEarthquakes] = useState<Earthquake[]>([]);
   const [earthquakeScope, setEarthquakeScope] = useState<"sri-lanka" | "regional">("sri-lanka");
   const [earthquakeLoading, setEarthquakeLoading] = useState(false);
+  const [countries, setCountries] = useState<CountryFeature[]>([]);
+  const [countriesLoaded, setCountriesLoaded] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<DistrictOption | null>(null);
   const [communityReports, setCommunityReports] = useState<CommunityReport[]>([]);
   const [reservoirs, setReservoirs] = useState<Reservoir[]>([]);
   const [showAllReservoirs, setShowAllReservoirs] = useState(false);
+  const [floodRisk, setFloodRisk] = useState<FloodRiskDistrict[]>([]);
+  const [floodRiskModel, setFloodRiskModel] = useState<FloodRiskModelMeta | null>(null);
+  const [floodRiskAvailable, setFloodRiskAvailable] = useState(true);
+  const [floodRiskLoaded, setFloodRiskLoaded] = useState(false);
+  const [retrainingModel, setRetrainingModel] = useState(false);
+  const [retrainError, setRetrainError] = useState<string | null>(null);
+  const [retrainedJustNow, setRetrainedJustNow] = useState(false);
   const [loading, setLoading] = useState(true);
   const [areasLoaded, setAreasLoaded] = useState(false);
   const [gaugesLoaded, setGaugesLoaded] = useState(false);
@@ -340,6 +427,15 @@ export default function SituationMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [earthquakeScope]);
 
+  useEffect(() => {
+    if ((viewMode === "gdacs" || viewMode === "earthquakes") && !countriesLoaded) {
+      apiFetch("/api/external/world-countries").then((data) => {
+        setCountries(data.features || []);
+        setCountriesLoaded(true);
+      });
+    }
+  }, [viewMode, countriesLoaded]);
+
   async function markAlertDistrictActive(index: number, alertTitle: string) {
     const district = alertDistrict[index];
     if (!district) return;
@@ -352,6 +448,29 @@ export default function SituationMap() {
       setMarkedAlerts((prev) => ({ ...prev, [index]: district }));
     } finally {
       setMarkingAlert(null);
+    }
+  }
+
+  // Re-runs the full training pipeline server-side (~30-60s: 25 sequential
+  // NASA POWER calls) instead of an admin needing to SSH in and run
+  // `node scripts/train-flood-risk-model.js` by hand. Forces a fresh
+  // GET /flood-risk afterward since the backend already busts its own
+  // cache — this component's local `floodRisk` state still needs telling.
+  async function retrainFloodModel() {
+    setRetrainingModel(true);
+    setRetrainError(null);
+    setRetrainedJustNow(false);
+    try {
+      await apiFetch("/api/external/flood-risk/retrain", { method: "POST" });
+      const data = await apiFetch("/api/external/flood-risk");
+      setFloodRisk(data.districts || []);
+      setFloodRiskModel(data.model || null);
+      setFloodRiskAvailable(!!data.available);
+      setRetrainedJustNow(true);
+    } catch (err: any) {
+      setRetrainError(err?.message || "Retraining failed.");
+    } finally {
+      setRetrainingModel(false);
     }
   }
 
@@ -368,7 +487,15 @@ export default function SituationMap() {
         setGaugesLoaded(true);
       });
     }
-  }, [viewMode, areasLoaded, gaugesLoaded]);
+    if (viewMode === "floodRisk" && !floodRiskLoaded) {
+      apiFetch("/api/external/flood-risk").then((data) => {
+        setFloodRisk(data.districts || []);
+        setFloodRiskModel(data.model || null);
+        setFloodRiskAvailable(!!data.available);
+        setFloodRiskLoaded(true);
+      });
+    }
+  }, [viewMode, areasLoaded, gaugesLoaded, floodRiskLoaded]);
 
   return (
     <DashboardLayout>
@@ -377,62 +504,88 @@ export default function SituationMap() {
         <p className="text-sm text-gray-500">Admin only</p>
       </div>
 
-      <div className="mt-4 flex gap-2">
-        <button
-          onClick={() => setViewMode("requests")}
-          className={`rounded px-4 py-2 text-sm font-medium ${
-            viewMode === "requests" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-          } border border-gray-300`}
-        >
-          Requests
-        </button>
-        <button
-          onClick={() => setViewMode("areas")}
-          className={`rounded px-4 py-2 text-sm font-medium ${
-            viewMode === "areas" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-          } border border-gray-300`}
-        >
-          Areas Affected
-        </button>
-        <button
-          onClick={() => setViewMode("gauges")}
-          className={`rounded px-4 py-2 text-sm font-medium ${
-            viewMode === "gauges" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-          } border border-gray-300`}
-        >
-          River Gauges
-        </button>
-        <button
-          onClick={() => setViewMode("reservoirs")}
-          className={`rounded px-4 py-2 text-sm font-medium ${
-            viewMode === "reservoirs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-          } border border-gray-300`}
-        >
-          Reservoirs
-        </button>
-        <button
-          onClick={() => setViewMode("gdacs")}
-          className={`rounded px-4 py-2 text-sm font-medium ${
-            viewMode === "gdacs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-          } border border-gray-300`}
-        >
-          Global Alerts (GDACS)
-        </button>
-        <button
-          onClick={() => setViewMode("earthquakes")}
-          className={`rounded px-4 py-2 text-sm font-medium ${
-            viewMode === "earthquakes" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-          } border border-gray-300`}
-        >
-          Tsunami Risk (Earthquakes)
-        </button>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-t-xl border border-b-0 border-gray-200 bg-white p-4">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setViewMode("requests")}
+            className={`rounded px-4 py-2 text-sm font-medium ${
+              viewMode === "requests" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+            } border border-gray-300`}
+          >
+            Requests
+          </button>
+          <button
+            onClick={() => setViewMode("areas")}
+            className={`rounded px-4 py-2 text-sm font-medium ${
+              viewMode === "areas" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+            } border border-gray-300`}
+          >
+            Areas Affected
+          </button>
+          <button
+            onClick={() => setViewMode("gauges")}
+            className={`rounded px-4 py-2 text-sm font-medium ${
+              viewMode === "gauges" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+            } border border-gray-300`}
+          >
+            River Gauges
+          </button>
+          <button
+            onClick={() => setViewMode("reservoirs")}
+            className={`rounded px-4 py-2 text-sm font-medium ${
+              viewMode === "reservoirs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+            } border border-gray-300`}
+          >
+            Reservoirs
+          </button>
+          <button
+            onClick={() => setViewMode("floodRisk")}
+            className={`rounded px-4 py-2 text-sm font-medium ${
+              viewMode === "floodRisk" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+            } border border-gray-300`}
+          >
+            Flood Risk Forecast
+          </button>
+          <button
+            onClick={() => setViewMode("gdacs")}
+            className={`rounded px-4 py-2 text-sm font-medium ${
+              viewMode === "gdacs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+            } border border-gray-300`}
+          >
+            Global Alerts (GDACS)
+          </button>
+          <button
+            onClick={() => setViewMode("earthquakes")}
+            className={`rounded px-4 py-2 text-sm font-medium ${
+              viewMode === "earthquakes" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+            } border border-gray-300`}
+          >
+            Tsunami Risk (Earthquakes)
+          </button>
+        </div>
+        {(viewMode === "gdacs" || viewMode === "earthquakes") && countriesLoaded && (
+          <CountrySearchBox
+            countries={countries}
+            onSelect={setSelectedCountry}
+            onClear={() => setSelectedCountry(null)}
+            selectedName={selectedCountry?.properties.name || null}
+          />
+        )}
+        {LOCAL_DISTRICT_TABS.includes(viewMode) && (
+          <DistrictSearchBox
+            onSelect={setSelectedDistrict}
+            onClear={() => setSelectedDistrict(null)}
+            selectedName={selectedDistrict?.name || null}
+          />
+        )}
       </div>
 
       {loading ? (
         <p className="mt-4 text-sm text-gray-500">Loading...</p>
       ) : (
         <>
-          <div className="mb-4 mt-4 flex flex-wrap gap-4 text-xs text-gray-600">
+          <div className="mb-4 rounded-b-xl border border-t-0 border-gray-200 bg-white p-4">
+          <div className="flex flex-wrap gap-4 text-xs text-gray-600">
             {viewMode === "requests" && (
               <>
                 {Object.entries(SEVERITY_COLOR).map(([severity, color]) => (
@@ -484,6 +637,13 @@ export default function SituationMap() {
                 </div>
               </>
             )}
+            {viewMode === "floodRisk" &&
+              Object.entries(FLOOD_RISK_COLOR).map(([level, color]) => (
+                <div key={`flood-risk-${level}`} className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+                  {FLOOD_RISK_LABEL[level]}
+                </div>
+              ))}
             {viewMode === "gdacs" &&
               Object.entries(GDACS_ALERT_LEAFLET_COLOR).map(([level, color]) => (
                 <div key={`gdacs-${level}`} className="flex items-center gap-1.5">
@@ -519,6 +679,37 @@ export default function SituationMap() {
             reservoirs.filter((r) => r.lat != null && r.lng != null).length === 0 && (
               <p className="mb-4 text-sm text-gray-500">Reservoir location data is temporarily unavailable.</p>
             )}
+
+
+          {viewMode === "floodRisk" && floodRiskModel && (
+            <div className="mb-4">
+              <p className="text-xs text-gray-400">
+                A trained model (logistic regression), not a guess: learned from {floodRiskModel.trainingWindow.startYear}-
+                {floodRiskModel.trainingWindow.endYear} historical flood reports (UNDRR DesInventar Sri Lanka) and daily
+                rainfall data (NASA POWER) for Sri Lanka. Its riskiest-ranked district-months are about{" "}
+                {(floodRiskModel.topDecilePrecision / floodRiskModel.baseRate).toFixed(1)}x more likely to have had a
+                real flood than a random one — real signal, but this is a dissertation-scope model, not a certified
+                forecasting system. Treat it as one input among many, not a guarantee.
+              </p>
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  onClick={retrainFloodModel}
+                  disabled={retrainingModel}
+                  className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {retrainingModel ? "Retraining… (~30-60s)" : "Retrain model now"}
+                </button>
+                <span className="text-xs text-gray-400">
+                  Trained {new Date(floodRiskModel.trainedAt).toLocaleString()}
+                </span>
+                {retrainedJustNow && <span className="text-xs font-medium text-green-700">Model refreshed ✓</span>}
+                {retrainError && <span className="text-xs font-medium text-red-600">{retrainError}</span>}
+              </div>
+            </div>
+          )}
+          {viewMode === "floodRisk" && floodRiskLoaded && !floodRiskAvailable && (
+            <p className="mb-4 text-sm text-gray-500">The flood risk model is temporarily unavailable.</p>
+          )}
 
           {viewMode === "earthquakes" && (
             <p className="mb-4 text-xs text-gray-400">
@@ -579,10 +770,16 @@ export default function SituationMap() {
                 : "No GDACS-tracked events relevant to Sri Lanka right now."}
             </p>
           )}
+          </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200" style={{ height: "600px" }}>
             <MapContainer center={SRI_LANKA_CENTER} zoom={8} style={{ height: "100%", width: "100%" }}>
-              <MapViewController viewMode={viewMode} earthquakeScope={earthquakeScope} />
+              <MapViewController
+                viewMode={viewMode}
+                earthquakeScope={earthquakeScope}
+                selectedCountry={selectedCountry}
+                selectedDistrict={selectedDistrict}
+              />
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -720,6 +917,43 @@ export default function SituationMap() {
                       </CircleMarker>
                     );
                   })}
+              {viewMode === "floodRisk" &&
+                floodRisk
+                  .filter((f) => !f.error)
+                  .map((f) => (
+                    <CircleMarker
+                      key={f.district}
+                      center={[f.lat, f.lng]}
+                      radius={9}
+                      pathOptions={{
+                        color: FLOOD_RISK_COLOR[f.riskLevel],
+                        fillColor: FLOOD_RISK_COLOR[f.riskLevel],
+                        fillOpacity: 0.6,
+                      }}
+                    >
+                      <Popup>
+                        <strong>{f.district}</strong>
+                        <br />
+                        Flood risk this month: {Math.round(f.probability * 100)}%
+                        <br />
+                        {FLOOD_RISK_LABEL[f.riskLevel]}
+                        {f.basis.historicalMonthFloodRate != null && (
+                          <>
+                            <br />
+                            Historically, {Math.round(f.basis.historicalMonthFloodRate * 100)}% of years had a
+                            reported flood here this month
+                          </>
+                        )}
+                      </Popup>
+                    </CircleMarker>
+                  ))}
+              {(viewMode === "gdacs" || viewMode === "earthquakes") && selectedCountry && (
+                <GeoJSON
+                  key={selectedCountry.properties.name}
+                  data={selectedCountry as any}
+                  style={{ color: "#7c3aed", weight: 3, fillColor: "#7c3aed", fillOpacity: 0.08, dashArray: "6" }}
+                />
+              )}
               {viewMode === "gdacs" &&
                 gdacsEvents.map((event) => {
                   const color = GDACS_ALERT_LEAFLET_COLOR[event.alertLevel || ""] || "#6b7280";

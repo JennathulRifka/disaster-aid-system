@@ -4,3 +4,7 @@ node_modules/
 serviceAccountKey.json
 *serviceAccount*.json
 npm-debug.log*
+
+# Firestore backups (backup-firestore.js) — contains real PII (NIC, phone,
+# home address), never commit.
+backups/

@@ -1,0 +1,57 @@
+
+ RUN  v4.1.11 C:/Users/SINGER/Documents/GitHub/disaster-aid-system/server
+
+ ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'verified' when every item is still pending 2ms
+ ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'in_progress' when at least one item has moved but not all delivered 0ms
+ ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'in_progress' when some are delivered but not all 0ms
+ ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'delivered' only when every item is delivered 0ms
+ ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'delivered' for a single-item request that's delivered 0ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > riskLevelFor > buckets probabilities into the 4 documented risk levels 3ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > sigmoid > returns exactly 0.5 at z=0 0ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > sigmoid > approaches 1 for large positive z and 0 for large negative z 0ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > currentMonthProjectedTotal > projects a full-month total from the days observed so far 1ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > currentMonthProjectedTotal > skips -999 (missing) days rather than counting them as zero rainfall 1ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > currentMonthProjectedTotal > falls back to the recent average rate when zero days are observed yet 1ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > recentAverageDailyRate > averages the most recent N fully-reported days ending at 'now' 1ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > recentAverageDailyRate > returns 0 when no valid days are found at all 0ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > prior30dTotal > sums exactly the 30 days immediately before the given month start 1ms
+ ✓ src/utils/__tests__/floodPrediction.test.js > prior30dTotal > ignores days on or after the month start 0ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > DesInventar flood records data integrity > has a substantial number of real historical records 3ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > DesInventar flood records data integrity > every record has the expected schema 13ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > DesInventar flood records data integrity > every district name maps to a real Sri Lankan district (via the alias table if needed) 3ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > DesInventar flood records data integrity > covers a multi-decade year range within the model's training window 2ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > has the expected top-level structure 0ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > training did not diverge — every weight and the bias are finite numbers 0ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > every district-month historical base rate is a valid probability 17ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > matches known Sri Lankan monsoon geography: Ratnapura (May) floods far more often than Mannar (February) 1ms
+ ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > the model's own reported top-decile precision genuinely beats its base rate 1ms
+ ✓ src/utils/__tests__/districts.test.js > DISTRICTS > has all 25 of Sri Lanka's real administrative districts, no duplicates 3ms
+ ✓ src/utils/__tests__/districts.test.js > DISTRICTS > every district has plausible Sri Lankan coordinates 4ms
+ ✓ src/utils/__tests__/districts.test.js > nearestDistrict > matches a point exactly at a district's own centroid to that district 1ms
+ ✓ src/utils/__tests__/districts.test.js > nearestDistrict > matches a point slightly offset from a centroid to the same nearest district 0ms
+ ✓ src/utils/__tests__/districts.test.js > nearestDistrict > picks the genuinely closest district for a point between two candidates 1ms
+ ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > weights severity levels correctly 4ms
+ ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > defaults unknown/missing severity to the 'low' weight rather than 0 1ms
+ ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > scores 2 points per person affected, capped at 30 0ms
+ ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > scores 5 points per vulnerable group, capped at 25 1ms
+ ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > treats a missing vulnerableGroups array as zero, not a crash 0ms
+ ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > total is the sum of all four criteria, rounded to 2 decimals 0ms
+ ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > waitScore grows with elapsed time and caps at 20 0ms
+ ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > normalizes a local-format number (leading 0) 3ms
+ ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > normalizes an already-international number with + 0ms
+ ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > normalizes a bare international number with no + 0ms
+ ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > normalizes a 9-digit number with no leading 0 or country code 0ms
+ ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > strips spaces and dashes before normalizing 0ms
+ ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > rejects landline numbers (011... etc, second digit isn't 7) 0ms
+ ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > rejects garbage input 0ms
+ ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > returns null for empty/falsy input rather than throwing 0ms
+ ✓ src/utils/__tests__/geo.test.js > distanceKm > returns 0 for identical points 2ms
+ ✓ src/utils/__tests__/geo.test.js > distanceKm > returns a real-world-accurate distance between two known cities 0ms
+ ✓ src/utils/__tests__/geo.test.js > distanceKm > is symmetric regardless of argument order 0ms
+ ✓ src/utils/__tests__/geo.test.js > distanceKm > returns Infinity when either point is missing 0ms
+
+ Test Files  7 passed (7)
+      Tests  48 passed (48)
+   Start at  15:42:32
+   Duration  1.03s (transform 105ms, setup 0ms, import 231ms, tests 91ms, environment 1ms)
+

@@ -27,6 +27,7 @@ const ACTION_LABELS: Record<string, string> = {
   "sos.status_update": "Updated SOS status",
   "community_report.verify": "Verified community report",
   "community_report.dismiss": "Dismissed community report",
+  "flood_model.retrain": "Retrained flood risk model",
 };
 
 const ACTION_BADGE: Record<string, string> = {
@@ -44,6 +45,7 @@ const ACTION_BADGE: Record<string, string> = {
   "sos.status_update": "bg-red-100 text-red-800",
   "community_report.verify": "bg-green-100 text-green-800",
   "community_report.dismiss": "bg-gray-100 text-gray-800",
+  "flood_model.retrain": "bg-purple-100 text-purple-800",
 };
 
 function describeEntry(entry: AuditEntry) {
@@ -76,6 +78,10 @@ function describeEntry(entry: AuditEntry) {
     case "community_report.verify":
     case "community_report.dismiss":
       return `${entry.details.reportType} by ${entry.details.reporterName} — ${entry.details.district || "unknown district"}`;
+    case "flood_model.retrain": {
+      const multiplier = entry.details.baseRate ? (entry.details.topDecilePrecision / entry.details.baseRate).toFixed(1) : "?";
+      return `${entry.details.sampleCount} samples, ${multiplier}x baseline top-decile precision`;
+    }
     default:
       return entry.targetId || "";
   }

@@ -1,11 +1,11 @@
 name: CI
 
-# Runs on every push and pull request against main. This project has no
-# automated test suite yet (see CLAUDE.md), so this pipeline verifies the one
-# thing that actually matters pre-deployment: every sub-project (server, web,
-# mobile) installs cleanly and compiles/builds without errors. No secrets or
-# real Firebase/API credentials are needed for any of these checks — nothing
-# here actually starts the server or runs the app against live data.
+# Runs on every push and pull request against main. Verifies that every
+# sub-project (server, web, mobile) installs cleanly and compiles/builds
+# without errors, plus — for server and web, which now have both — lints
+# clean and passes its unit test suite. No secrets or real Firebase/API
+# credentials are needed for any of these checks — nothing here actually
+# starts the server or runs the app against live data.
 on:
   push:
     branches: [main]
@@ -14,7 +14,7 @@ on:
 
 jobs:
   server:
-    name: Server (syntax check)
+    name: Server (lint + test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,9 +29,15 @@ jobs:
       - name: Syntax-check every source file
         working-directory: server
         run: find src -name "*.js" -print0 | xargs -0 -n1 node --check
+      - name: Lint
+        working-directory: server
+        run: npm run lint
+      - name: Unit tests
+        working-directory: server
+        run: npm test
 
   web:
-    name: Web (type-check + build)
+    name: Web (lint + test + type-check + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +49,12 @@ jobs:
       - name: Install dependencies
         working-directory: web
         run: npm ci
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+      - name: Unit tests
+        working-directory: web
+        run: npm test
       - name: Type-check
         working-directory: web
         run: npx tsc --noEmit

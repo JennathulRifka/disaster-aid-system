@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const data = await apiFetch("/api/users/me");
           setProfile(data);
-        } catch (err) {
+        } catch {
           // Right after registration, this listener can fire before the
           // POST /api/users/profile write (started separately in
           // registerUser) has landed in Firestore, causing a spurious 403.

@@ -1,0 +1,15 @@
+
+ RUN  v4.1.11 C:/Users/SINGER/Documents/GitHub/disaster-aid-system/web
+
+ ✓ src/lib/__tests__/phone.test.ts > normalizeSriLankanPhone (client mirror) > normalizes common input formats to the same bare digit string 3ms
+ ✓ src/lib/__tests__/phone.test.ts > normalizeSriLankanPhone (client mirror) > rejects landlines and garbage input 0ms
+ ✓ src/lib/__tests__/phone.test.ts > normalizeSriLankanPhone (client mirror) > returns null for empty input 0ms
+ ✓ src/lib/__tests__/districts.test.ts > DISTRICTS (client mirror) > has all 25 districts, matching the server's own list 2ms
+ ✓ src/lib/__tests__/districts.test.ts > nearestDistrict > matches a point exactly at a district's own centroid to that district 1ms
+ ✓ src/lib/__tests__/districts.test.ts > nearestDistrict > returns null for a missing/undefined location rather than throwing 0ms
+
+ Test Files  2 passed (2)
+      Tests  6 passed (6)
+   Start at  15:43:37
+   Duration  822ms (transform 698ms, setup 0ms, import 753ms, tests 11ms, environment 0ms)
+

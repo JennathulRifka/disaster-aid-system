@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { CheckCircle2, AlertTriangle, AlertOctagon } from "lucide-react";
 import { AreaSeverityMap } from "@/components/AreaSeverityMap";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { AccessibilityControls } from "@/components/AccessibilityControls";
+import { MapWalkthroughModal } from "@/components/MapWalkthroughModal";
+import { InfoDisclosure } from "@/components/InfoDisclosure";
+import { useMapWalkthrough } from "@/hooks/useMapWalkthrough";
 import { apiFetch } from "@/lib/api";
 
 interface Alert {
@@ -40,6 +45,16 @@ const GDACS_ALERT_COLOR: Record<string, string> = {
   Red: "bg-red-100 text-red-800",
 };
 
+// Color alone isn't accessible — every risk/alert badge on this page also
+// gets one of these icons, same "check / warning / danger" vocabulary used
+// on the map itself (AreaSeverityMap.tsx), so a colorblind or non-reading
+// visitor still gets the message.
+const GDACS_ALERT_ICON: Record<string, typeof CheckCircle2> = {
+  Green: CheckCircle2,
+  Orange: AlertTriangle,
+  Red: AlertOctagon,
+};
+
 interface Earthquake {
   id: string;
   magnitude: number;
@@ -54,6 +69,11 @@ function magnitudeColor(mag: number): string {
   if (mag >= 6) return "bg-red-100 text-red-800";
   if (mag >= 5) return "bg-amber-100 text-amber-800";
   return "bg-gray-100 text-gray-700";
+}
+
+function MagnitudeIcon({ mag }: { mag: number }) {
+  const Icon = mag >= 6 ? AlertOctagon : mag >= 5 ? AlertTriangle : CheckCircle2;
+  return <Icon size={12} />;
 }
 
 interface WeatherCity {
@@ -102,6 +122,12 @@ const RESERVOIR_RISK_BADGE: Record<string, string> = {
   spilling: "bg-red-100 text-red-800",
 };
 
+const RESERVOIR_RISK_ICON: Record<string, typeof CheckCircle2> = {
+  elevated: AlertTriangle,
+  high: AlertTriangle,
+  spilling: AlertOctagon,
+};
+
 export default function PublicSeverityMap() {
   const { t } = useTranslation();
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -115,6 +141,7 @@ export default function PublicSeverityMap() {
   const [weather, setWeather] = useState<WeatherCity[]>([]);
   const [reservoirs, setReservoirs] = useState<Reservoir[]>([]);
   const [showAllReservoirs, setShowAllReservoirs] = useState(false);
+  const walkthrough = useMapWalkthrough();
 
   useEffect(() => {
     apiFetch("/api/external/alerts").then(setAlerts);
@@ -152,7 +179,13 @@ export default function PublicSeverityMap() {
       <li key={r.name} className="rounded border border-gray-200 bg-white p-3 text-sm">
         <div className="flex flex-wrap items-center gap-2">
           {r.riskLevel !== "normal" && (
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${RESERVOIR_RISK_BADGE[r.riskLevel]}`}>
+            <span
+              className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${RESERVOIR_RISK_BADGE[r.riskLevel]}`}
+            >
+              {(() => {
+                const Icon = RESERVOIR_RISK_ICON[r.riskLevel] ?? AlertTriangle;
+                return <Icon size={12} />;
+              })()}
               {t(`severityMap.reservoirRisk${r.riskLevel.charAt(0).toUpperCase()}${r.riskLevel.slice(1)}`)}
             </span>
           )}
@@ -173,10 +206,12 @@ export default function PublicSeverityMap() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
+      <MapWalkthroughModal open={walkthrough.open} onClose={walkthrough.dismiss} />
       <header className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-5">
         <h1 className="text-lg font-semibold text-gray-900">{t("severityMap.title")}</h1>
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
+          <AccessibilityControls onShowHelp={walkthrough.show} />
           <Link to="/" className="text-sm text-slate-700 hover:underline">
             {t("common.backToHome")}
           </Link>
@@ -222,7 +257,7 @@ export default function PublicSeverityMap() {
 
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-gray-900">{t("severityMap.reservoirsTitle")}</h2>
-          <p className="mt-1 text-xs text-gray-400">{t("severityMap.reservoirsCaption")}</p>
+          <InfoDisclosure summary={t("severityMap.reservoirsSimpleCaption")} details={t("severityMap.reservoirsCaption")} />
 
           {(() => {
             const irrigation = reservoirs.filter((r) => r.source === "irrigation_department");
@@ -297,7 +332,7 @@ export default function PublicSeverityMap() {
 
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-gray-900">{t("severityMap.gdacsTitle")}</h2>
-          <p className="mt-1 text-xs text-gray-400">{t("severityMap.gdacsCaption")}</p>
+          <InfoDisclosure summary={t("severityMap.gdacsSimpleCaption")} details={t("severityMap.gdacsCaption")} />
           {gdacsLoading ? (
             <p className="mt-2 text-sm text-gray-500">{t("common.loading")}</p>
           ) : gdacsEvents.length === 0 ? (
@@ -333,10 +368,14 @@ export default function PublicSeverityMap() {
                     </span>
                     {event.alertLevel && (
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
                           GDACS_ALERT_COLOR[event.alertLevel] || "bg-gray-100 text-gray-700"
                         }`}
                       >
+                        {(() => {
+                          const Icon = GDACS_ALERT_ICON[event.alertLevel] ?? AlertTriangle;
+                          return <Icon size={12} />;
+                        })()}
                         {event.alertLevel}
                       </span>
                     )}
@@ -359,7 +398,7 @@ export default function PublicSeverityMap() {
 
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-gray-900">{t("severityMap.earthquakesTitle")}</h2>
-          <p className="mt-1 text-xs text-gray-400">{t("severityMap.earthquakesCaption")}</p>
+          <InfoDisclosure summary={t("severityMap.earthquakesSimpleCaption")} details={t("severityMap.earthquakesCaption")} />
           {earthquakesLoading ? (
             <p className="mt-2 text-sm text-gray-500">{t("common.loading")}</p>
           ) : earthquakes.length === 0 ? (
@@ -392,8 +431,12 @@ export default function PublicSeverityMap() {
               {earthquakes.map((eq) => (
                 <li key={eq.id} className="rounded border border-gray-200 bg-white p-3 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${magnitudeColor(eq.magnitude)}`}>
-                      M {eq.magnitude.toFixed(1)}
+                    <span
+                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${magnitudeColor(
+                        eq.magnitude
+                      )}`}
+                    >
+                      <MagnitudeIcon mag={eq.magnitude} />M {eq.magnitude.toFixed(1)}
                     </span>
                     {eq.tsunami && (
                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">

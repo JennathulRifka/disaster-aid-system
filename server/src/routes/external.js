@@ -3,8 +3,14 @@ const { XMLParser } = require("fast-xml-parser");
 const AdmZip = require("adm-zip");
 const simplify = require("@turf/simplify").default;
 const Papa = require("papaparse");
-const { getCached } = require("../utils/cache");
+const topojson = require("topojson-client");
+const worldCountriesTopo = require("world-atlas/countries-110m.json");
+const { getCached, invalidate } = require("../utils/cache");
 const { DISTRICTS, nearestDistrict } = require("../utils/districts");
+const { predictAllDistricts, isModelAvailable, getModelMeta, reloadModel } = require("../utils/floodPrediction");
+const { trainFloodRiskModel } = require("../utils/trainFloodRiskModel");
+const { requireAuth, requireRole } = require("../middleware/authMiddleware");
+const { logAction } = require("../utils/auditLog");
 
 const router = express.Router();
 
@@ -116,6 +122,7 @@ const DISTRICT_BOUNDARIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h — distric
 const USGS_CACHE_TTL_MS = 20 * 60 * 1000; // 20 min — real-time-ish but not second-critical
 const WEATHER_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min — weather doesn't need to be second-fresh, and keeps well within free-tier call limits
 const RESERVOIR_CACHE_TTL_MS = 60 * 60 * 1000; // 1h — the sheet itself is a once-daily bulletin (see DATE column)
+const FLOOD_RISK_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h — depends on live rainfall, but doesn't need to be minute-fresh; also 25 sequential NASA POWER calls per refresh
 
 // The Irrigation Department's Water Management Branch publishes daily
 // reservoir water-level/storage bulletins as a Google Sheet, published to the
@@ -507,6 +514,44 @@ router.get("/district-boundaries", async (req, res) => {
 });
 
 /**
+ * GET /api/external/world-countries
+ * Public. World country outlines, for the GDACS/earthquake tabs' "search a
+ * country and zoom to it" feature — the user shouldn't need to already know
+ * where e.g. Nepal is on a map just to make sense of a global disaster feed.
+ * Deliberately NOT a live external fetch like every other feed in this file
+ * — country borders don't change, so this reads from the `world-atlas` npm
+ * package (Natural Earth data at 110m resolution, public domain, ~105KB)
+ * bundled with the server, computed to GeoJSON once and memoized in memory
+ * for the life of the process. No network dependency, no cache TTL needed,
+ * no risk of an upstream outage — the same discipline this file applies
+ * everywhere else (verify a source actually works) just points here at
+ * "don't add a network dependency for data that never changes" instead.
+ * Antarctica is filtered out — not relevant to a disaster-alert search.
+ */
+let worldCountriesGeoJson = null;
+function getWorldCountriesGeoJson() {
+  if (!worldCountriesGeoJson) {
+    const converted = topojson.feature(worldCountriesTopo, worldCountriesTopo.objects.countries);
+    worldCountriesGeoJson = {
+      type: "FeatureCollection",
+      features: converted.features
+        .filter((f) => f.properties?.name && f.properties.name !== "Antarctica")
+        .map((f) => ({ type: "Feature", properties: { name: f.properties.name }, geometry: f.geometry })),
+    };
+  }
+  return worldCountriesGeoJson;
+}
+
+router.get("/world-countries", (req, res) => {
+  try {
+    return res.json(getWorldCountriesGeoJson());
+  } catch (err) {
+    console.error("World countries error:", err.message);
+    return res.json({ type: "FeatureCollection", features: [] });
+  }
+});
+
+/**
  * GET /api/external/earthquakes
  * Public. Recent earthquakes (last 30 days, magnitude 4.0+) from USGS's
  * public catalog. `?scope=sri-lanka` (default) queries a tight box around
@@ -832,6 +877,61 @@ router.get("/reservoirs", async (req, res) => {
   } catch (err) {
     console.error("Reservoirs fetch error:", err.message);
     return res.json([]);
+  }
+});
+
+/**
+ * GET /api/external/flood-risk
+ * Public. Per-district flood risk for the current calendar month, from a
+ * logistic regression trained offline (scripts/train-flood-risk-model.js)
+ * on real historical data: 8,182 DesInventar-reported flood incidents for
+ * Sri Lanka (1981-2020) and matching historical daily rainfall from NASA
+ * POWER. At request time this only evaluates the already-trained model
+ * against this month's live rainfall — no retraining happens here. See
+ * "Flood risk forecast" in CLAUDE.md for the full story, including the
+ * model's honestly-reported accuracy (~3.8x baseline on a top-decile
+ * precision check — real signal, not a strong forecaster).
+ */
+router.get("/flood-risk", async (req, res) => {
+  try {
+    if (!isModelAvailable()) {
+      return res.json({ available: false, districts: [] });
+    }
+    const districts = await getCached("flood-risk", FLOOD_RISK_CACHE_TTL_MS, predictAllDistricts);
+    return res.json({ available: true, model: getModelMeta(), districts });
+  } catch (err) {
+    console.error("Flood risk error:", err.message);
+    return res.json({ available: false, districts: [] });
+  }
+});
+
+/**
+ * POST /api/external/flood-risk/retrain
+ * Admin only. Re-runs the full training pipeline (scripts/train-flood-
+ * risk-model.js's logic, shared via utils/trainFloodRiskModel.js) right
+ * now instead of requiring someone to SSH in and run the script by hand —
+ * takes ~30-60s (25 sequential NASA POWER calls), so this is a slow
+ * synchronous request by design, not a background job: this app has no
+ * job-queue infrastructure elsewhere, and a one-off admin action blocking
+ * for under a minute is an acceptable tradeoff over building one just for
+ * this. Reloads the in-memory model and busts the cached predictions
+ * immediately after, so the very next GET /flood-risk reflects the fresh
+ * model rather than serving stale cached output for up to 6 more hours.
+ */
+router.post("/flood-risk/retrain", requireAuth, requireRole("admin"), async (req, res) => {
+  try {
+    const model = await trainFloodRiskModel();
+    reloadModel();
+    invalidate("flood-risk");
+    await logAction(req.user, "flood_model.retrain", { type: "floodRiskModel", id: null }, {
+      sampleCount: model.sampleCount,
+      topDecilePrecision: model.topDecilePrecision,
+      baseRate: model.baseRate,
+    });
+    return res.json({ success: true, model: getModelMeta() });
+  } catch (err) {
+    console.error("Flood risk retrain error:", err.message);
+    return res.status(500).json({ error: "Retraining failed.", details: err.message });
   }
 });
 

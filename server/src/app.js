@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const pinoHttp = require("pino-http");
+const { logger } = require("./utils/logger");
 
 const usersRoutes = require("./routes/users");
 const requestsRoutes = require("./routes/requests");
@@ -30,6 +32,13 @@ app.use(
 
 app.use(express.json());
 
+// Structured request logging (method, path, status, response time) — this
+// project had no request logging at all before, not just unstructured
+// console.log calls, so this is a new capability rather than a like-for-like
+// swap. Health checks and the CI-invisible dev-tooling noise aren't filtered
+// out; that's a reasonable follow-up if the log ever gets noisy in practice.
+app.use(pinoHttp({ logger }));
+
 // Simple health check — visit this in your browser to confirm the server is alive
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "Disaster Aid API is running." });
@@ -56,8 +65,8 @@ app.use((req, res) => {
 });
 
 // Central error handler (catches anything thrown that wasn't already caught)
-app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err);
+app.use((err, req, res, _next) => {
+  req.log ? req.log.error({ err }, "Unhandled error") : logger.error({ err }, "Unhandled error");
   res.status(500).json({ error: "Something went wrong on the server." });
 });
 

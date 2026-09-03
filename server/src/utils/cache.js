@@ -31,4 +31,13 @@ function getCached(key, ttlMs, fetcher) {
   return promise;
 }
 
-module.exports = { getCached };
+/** Evicts a cache entry immediately, so the next getCached() call for that
+ * key re-fetches instead of serving a stale value for the rest of its TTL —
+ * used after the admin "Retrain model" button writes a fresh flood risk
+ * model, so the cached predictions (computed against the old model) don't
+ * linger for up to 6 more hours. */
+function invalidate(key) {
+  store.delete(key);
+}
+
+module.exports = { getCached, invalidate };

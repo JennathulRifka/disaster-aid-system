@@ -1,10 +1,14 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { MapContainer, TileLayer, CircleMarker, GeoJSON, Polygon, Popup, useMap } from "react-leaflet";
 import type { Feature, FeatureCollection } from "geojson";
 import type { Layer, PathOptions } from "leaflet";
+import { geoJSON as leafletGeoJSON } from "leaflet";
 import { useTranslation } from "react-i18next";
+import { CheckCircle2, AlertTriangle, AlertOctagon, HelpCircle } from "lucide-react";
 import "@/lib/leafletIcons";
 import { apiFetch } from "@/lib/api";
+import { CountrySearchBox, type CountryFeature } from "@/components/CountrySearchBox";
+import { InfoDisclosure } from "@/components/InfoDisclosure";
 
 interface AreaStat {
   district: string;
@@ -60,6 +64,29 @@ interface Earthquake {
   lng: number;
 }
 
+interface FloodRiskDistrict {
+  district: string;
+  lat: number;
+  lng: number;
+  month: number;
+  probability: number;
+  riskLevel: "low" | "moderate" | "elevated" | "high";
+  basis: {
+    projectedMonthRainfallMm: number;
+    prior30dRainfallMm: number;
+    historicalMonthFloodRate: number | null;
+  };
+  error?: boolean;
+}
+
+interface FloodRiskModelMeta {
+  trainedAt: string;
+  trainingWindow: { startYear: number; endYear: number };
+  topDecilePrecision: number;
+  baseRate: number;
+  sources: string[];
+}
+
 interface Reservoir {
   name: string;
   size: "major" | "medium" | "hydropower";
@@ -101,6 +128,12 @@ function magnitudeColor(mag: number): string {
   return "#6b7280";
 }
 
+function magnitudeTier(mag: number): SeverityTier {
+  if (mag >= 6) return "danger";
+  if (mag >= 5) return "caution";
+  return "unknown";
+}
+
 // Same hue progression as GAUGE_STATUS_COLOR — reservoir risk (storage %) is
 // a different metric from gauge flow status, but the same gradient reads
 // consistently on the same map. Used only for Kotmale/Victoria/Randenigala
@@ -121,10 +154,86 @@ const RESERVOIR_RISK_COLOR: Record<string, string> = {
 // point — an honest reflection of the source data's limits, not a bug.
 const RESERVOIR_APPROX_COLOR = "#f9a8d4";
 
+// Same worse-is-redder gradient as everywhere else on this map, re-keyed to
+// the flood risk model's own 4 output levels (see server/src/utils/
+// floodPrediction.js's RISK_LEVELS thresholds).
+const FLOOD_RISK_COLOR: Record<string, string> = {
+  low: "#16a34a",
+  moderate: "#f59e0b",
+  elevated: "#f97316",
+  high: "#dc2626",
+};
+
+// Color alone isn't accessible (colorblind users, low-literacy users who
+// skip the text label) — every colored dot/marker on this map also gets one
+// of these 4 icons, so risk is legible from shape as well as hue. Each
+// layer's specific status values map onto this shared "how worried should I
+// be" vocabulary via the *_TIER lookups below.
+type SeverityTier = "safe" | "caution" | "danger" | "unknown";
+const TIER_ICON: Record<SeverityTier, typeof CheckCircle2> = {
+  safe: CheckCircle2,
+  caution: AlertTriangle,
+  danger: AlertOctagon,
+  unknown: HelpCircle,
+};
+// Same 4 tiers as plain Unicode symbols, for the GeoJSON boundary layers'
+// raw HTML popup strings (bindPopup takes a string, not JSX, so a real
+// lucide icon can't be rendered there).
+const TIER_SYMBOL: Record<SeverityTier, string> = {
+  safe: "✓", // check mark
+  caution: "⚠", // warning triangle
+  danger: "❗", // heavy exclamation mark
+  unknown: "?",
+};
+
+const LEVEL_TIER: Record<string, SeverityTier> = { high: "danger", moderate: "caution", low: "safe", none: "unknown" };
+const GAUGE_STATUS_TIER: Record<string, SeverityTier> = {
+  major_flood: "danger",
+  minor_flood: "danger",
+  alert: "caution",
+  normal: "safe",
+};
+const RESERVOIR_RISK_TIER: Record<string, SeverityTier> = {
+  spilling: "danger",
+  high: "caution",
+  elevated: "caution",
+  normal: "safe",
+};
+const FLOOD_RISK_TIER: Record<string, SeverityTier> = {
+  high: "danger",
+  elevated: "caution",
+  moderate: "caution",
+  low: "safe",
+};
+const GDACS_TIER: Record<string, SeverityTier> = { Red: "danger", Orange: "caution", Green: "safe" };
+
+/** One legend row: colored dot + tier icon + text label, always together. */
+function LegendItem({ color, tier, children }: { color: string; tier: SeverityTier; children: ReactNode }) {
+  const Icon = TIER_ICON[tier];
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+      <Icon size={13} className="text-gray-500" />
+      {children}
+    </div>
+  );
+}
+
+/** Same icon+text pairing, for use inside a Leaflet <Popup>. */
+function TierLabel({ tier, children }: { tier: SeverityTier; children: ReactNode }) {
+  const Icon = TIER_ICON[tier];
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Icon size={12} />
+      {children}
+    </span>
+  );
+}
+
 const SRI_LANKA_CENTER: [number, number] = [7.8731, 80.7718];
 const REGIONAL_CENTER: [number, number] = [8, 87]; // zooms out to include the Sumatra subduction zone, for the earthquakes layer
 
-type ViewMode = "areas" | "gauges" | "reservoirs" | "gdacs" | "earthquakes";
+type ViewMode = "areas" | "gauges" | "reservoirs" | "floodRisk" | "gdacs" | "earthquakes";
 
 // react-leaflet's MapContainer only applies center/zoom on first mount —
 // this recenters the existing map instance when switching to the
@@ -132,12 +241,30 @@ type ViewMode = "areas" | "gauges" | "reservoirs" | "gdacs" | "earthquakes";
 // outside the normal Sri-Lanka-only view, which the "sri-lanka" scope's own
 // bounding box roughly matches already), same pattern as SituationMap.tsx's
 // admin map.
-function MapViewController({ viewMode, earthquakeScope }: { viewMode: ViewMode; earthquakeScope: "sri-lanka" | "regional" }) {
+function MapViewController({
+  viewMode,
+  earthquakeScope,
+  selectedCountry,
+}: {
+  viewMode: ViewMode;
+  earthquakeScope: "sri-lanka" | "regional";
+  selectedCountry: CountryFeature | null;
+}) {
   const map = useMap();
   useEffect(() => {
+    // A searched country takes priority over the tab's own default view —
+    // that's the whole point of the search (see CountrySearchBox.tsx): jump
+    // straight to wherever the user just looked up, regardless of scope.
+    if (selectedCountry && (viewMode === "gdacs" || viewMode === "earthquakes")) {
+      const bounds = leafletGeoJSON(selectedCountry as any).getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [24, 24] });
+        return;
+      }
+    }
     const regional = viewMode === "earthquakes" && earthquakeScope === "regional";
     map.setView(regional ? REGIONAL_CENTER : SRI_LANKA_CENTER, regional ? 5 : 7);
-  }, [viewMode, earthquakeScope, map]);
+  }, [viewMode, earthquakeScope, selectedCountry, map]);
   return null;
 }
 
@@ -165,6 +292,10 @@ export function AreaSeverityMap({
   const [gauges, setGauges] = useState<GaugeStation[]>([]);
   const [reservoirs, setReservoirs] = useState<Reservoir[]>([]);
   const [reservoirsLoaded, setReservoirsLoaded] = useState(false);
+  const [floodRisk, setFloodRisk] = useState<FloodRiskDistrict[]>([]);
+  const [floodRiskModel, setFloodRiskModel] = useState<FloodRiskModelMeta | null>(null);
+  const [floodRiskAvailable, setFloodRiskAvailable] = useState(true);
+  const [floodRiskLoaded, setFloodRiskLoaded] = useState(false);
   const [gdacsEvents, setGdacsEvents] = useState<GdacsEvent[]>([]);
   const [gdacsScope, setGdacsScope] = useState<"sri-lanka" | "global">("sri-lanka");
   const [gdacsFetching, setGdacsFetching] = useState(false);
@@ -176,6 +307,9 @@ export function AreaSeverityMap({
   const [gaugesLoaded, setGaugesLoaded] = useState(false);
   const [gdacsLoaded, setGdacsLoaded] = useState(false);
   const [earthquakesLoaded, setEarthquakesLoaded] = useState(false);
+  const [countries, setCountries] = useState<CountryFeature[]>([]);
+  const [countriesLoaded, setCountriesLoaded] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<CountryFeature | null>(null);
 
   const LEVEL_LABEL: Record<string, string> = {
     high: t("severityMap.highNeed"),
@@ -234,6 +368,17 @@ export function AreaSeverityMap({
   }, [viewMode, reservoirsLoaded]);
 
   useEffect(() => {
+    if (viewMode === "floodRisk" && !floodRiskLoaded) {
+      apiFetch("/api/external/flood-risk").then((data) => {
+        setFloodRisk(data.districts || []);
+        setFloodRiskModel(data.model || null);
+        setFloodRiskAvailable(!!data.available);
+        setFloodRiskLoaded(true);
+      });
+    }
+  }, [viewMode, floodRiskLoaded]);
+
+  useEffect(() => {
     // Defaults to Sri-Lanka-relevant (usually empty) with a "view global
     // events" fallback — same pattern as the earthquake scope toggle just
     // below, and the admin map's own GDACS scope toggle. Refetches whenever
@@ -264,114 +409,139 @@ export function AreaSeverityMap({
       .finally(() => setEarthquakesFetching(false));
   }, [viewMode, earthquakeScope]);
 
+  useEffect(() => {
+    if ((viewMode === "gdacs" || viewMode === "earthquakes") && !countriesLoaded) {
+      apiFetch("/api/external/world-countries").then((data) => {
+        setCountries(data.features || []);
+        setCountriesLoaded(true);
+      });
+    }
+  }, [viewMode, countriesLoaded]);
+
   if (loading) {
     return <p className="text-sm text-gray-500">{t("common.loading")}</p>;
   }
 
+  const showCountrySearch = (viewMode === "gdacs" || viewMode === "earthquakes") && countriesLoaded;
+
   return (
     <>
-      {showToggle && (
-        <div className="mb-3 flex gap-2">
-          <button
-            onClick={() => setViewMode("areas")}
-            className={`rounded px-3 py-1.5 text-xs font-medium ${
-              viewMode === "areas" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-            } border border-gray-300`}
-          >
-            {t("severityMap.areasAffected")}
-          </button>
-          <button
-            onClick={() => setViewMode("gauges")}
-            className={`rounded px-3 py-1.5 text-xs font-medium ${
-              viewMode === "gauges" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-            } border border-gray-300`}
-          >
-            {t("severityMap.riverLevels")}
-          </button>
-          {extraLayers && (
-            <>
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4">
+        {showToggle && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setViewMode("reservoirs")}
+                onClick={() => setViewMode("areas")}
                 className={`rounded px-3 py-1.5 text-xs font-medium ${
-                  viewMode === "reservoirs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+                  viewMode === "areas" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
                 } border border-gray-300`}
               >
-                {t("severityMap.reservoirsTabLabel")}
+                {t("severityMap.areasAffected")}
               </button>
               <button
-                onClick={() => setViewMode("gdacs")}
+                onClick={() => setViewMode("gauges")}
                 className={`rounded px-3 py-1.5 text-xs font-medium ${
-                  viewMode === "gdacs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+                  viewMode === "gauges" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
                 } border border-gray-300`}
               >
-                {t("severityMap.gdacsTitle")}
+                {t("severityMap.riverLevels")}
               </button>
-              <button
-                onClick={() => setViewMode("earthquakes")}
-                className={`rounded px-3 py-1.5 text-xs font-medium ${
-                  viewMode === "earthquakes" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
-                } border border-gray-300`}
-              >
-                {t("severityMap.earthquakesTitle")}
-              </button>
-            </>
-          )}
-        </div>
-      )}
+              {extraLayers && (
+                <>
+                  <button
+                    onClick={() => setViewMode("reservoirs")}
+                    className={`rounded px-3 py-1.5 text-xs font-medium ${
+                      viewMode === "reservoirs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+                    } border border-gray-300`}
+                  >
+                    {t("severityMap.reservoirsTabLabel")}
+                  </button>
+                  <button
+                    onClick={() => setViewMode("floodRisk")}
+                    className={`rounded px-3 py-1.5 text-xs font-medium ${
+                      viewMode === "floodRisk" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+                    } border border-gray-300`}
+                  >
+                    {t("severityMap.floodRiskTabLabel")}
+                  </button>
+                  <button
+                    onClick={() => setViewMode("gdacs")}
+                    className={`rounded px-3 py-1.5 text-xs font-medium ${
+                      viewMode === "gdacs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+                    } border border-gray-300`}
+                  >
+                    {t("severityMap.gdacsTitle")}
+                  </button>
+                  <button
+                    onClick={() => setViewMode("earthquakes")}
+                    className={`rounded px-3 py-1.5 text-xs font-medium ${
+                      viewMode === "earthquakes" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+                    } border border-gray-300`}
+                  >
+                    {t("severityMap.earthquakesTitle")}
+                  </button>
+                </>
+              )}
+            </div>
+            {showCountrySearch && (
+              <CountrySearchBox
+                countries={countries}
+                onSelect={setSelectedCountry}
+                onClear={() => setSelectedCountry(null)}
+                selectedName={selectedCountry?.properties.name || null}
+              />
+            )}
+          </div>
+        )}
 
-      <div className="mb-4 flex flex-wrap gap-4 text-xs text-gray-600">
+      <div className="mb-4 mt-3 flex flex-wrap gap-4 border-t border-gray-100 pt-3 text-xs text-gray-600">
         {viewMode === "areas" &&
           Object.entries(LEVEL_LABEL).map(([level, label]) => (
-            <div key={level} className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: LEVEL_COLOR[level] }} />
+            <LegendItem key={level} color={LEVEL_COLOR[level]} tier={LEVEL_TIER[level] ?? "unknown"}>
               {label}
-            </div>
+            </LegendItem>
           ))}
         {viewMode === "gauges" &&
           Object.entries(GAUGE_STATUS_LABEL).map(([status, label]) => (
-            <div key={status} className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-3 w-3 rounded-full"
-                style={{ backgroundColor: GAUGE_STATUS_COLOR[status] }}
-              />
+            <LegendItem key={status} color={GAUGE_STATUS_COLOR[status]} tier={GAUGE_STATUS_TIER[status] ?? "unknown"}>
               {label}
-            </div>
+            </LegendItem>
           ))}
         {viewMode === "reservoirs" && (
           <>
             {Object.entries(RESERVOIR_RISK_COLOR).map(([level, color]) => (
-              <div key={`reservoir-${level}`} className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+              <LegendItem key={`reservoir-${level}`} color={color} tier={RESERVOIR_RISK_TIER[level] ?? "unknown"}>
                 {RESERVOIR_RISK_LABEL[level]}
-              </div>
+              </LegendItem>
             ))}
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: RESERVOIR_APPROX_COLOR }} />
+            <LegendItem color={RESERVOIR_APPROX_COLOR} tier="unknown">
               {t("severityMap.reservoirsApproxLegend")}
-            </div>
+            </LegendItem>
           </>
         )}
+        {viewMode === "floodRisk" &&
+          Object.entries(FLOOD_RISK_COLOR).map(([level, color]) => (
+            <LegendItem key={`flood-risk-${level}`} color={color} tier={FLOOD_RISK_TIER[level] ?? "unknown"}>
+              {t(`severityMap.floodRisk${level.charAt(0).toUpperCase()}${level.slice(1)}`)}
+            </LegendItem>
+          ))}
         {viewMode === "gdacs" &&
           Object.entries(GDACS_ALERT_COLOR).map(([level, color]) => (
-            <div key={`gdacs-${level}`} className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+            <LegendItem key={`gdacs-${level}`} color={color} tier={GDACS_TIER[level] ?? "unknown"}>
               GDACS {level}
-            </div>
+            </LegendItem>
           ))}
         {viewMode === "earthquakes" && (
           <>
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: "#dc2626" }} />
+            <LegendItem color="#dc2626" tier="danger">
               M 6.0+
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: "#f59e0b" }} />
+            </LegendItem>
+            <LegendItem color="#f59e0b" tier="caution">
               M 5.0–5.9
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: "#6b7280" }} />
+            </LegendItem>
+            <LegendItem color="#6b7280" tier="unknown">
               M 4.0–4.9
-            </div>
+            </LegendItem>
           </>
         )}
       </div>
@@ -380,16 +550,31 @@ export function AreaSeverityMap({
         <p className="mb-3 text-xs text-gray-400">{t("severityMap.unofficialData")}</p>
       )}
       {viewMode === "reservoirs" && (
-        <p className="mb-3 text-xs text-gray-400">{t("severityMap.reservoirsMapCaption")}</p>
+        <InfoDisclosure summary={t("severityMap.reservoirsSimpleCaption")} details={t("severityMap.reservoirsMapCaption")} />
       )}
       {viewMode === "reservoirs" &&
         reservoirsLoaded &&
         reservoirs.filter((r) => r.lat != null && r.lng != null).length === 0 && (
           <p className="mb-3 text-sm text-gray-500">{t("severityMap.reservoirsMapUnavailable")}</p>
         )}
-      {viewMode === "gdacs" && <p className="mb-3 text-xs text-gray-400">{t("severityMap.gdacsCaption")}</p>}
+      {viewMode === "floodRisk" && floodRiskModel && (
+        <InfoDisclosure
+          summary={t("severityMap.floodRiskSimpleCaption")}
+          details={t("severityMap.floodRiskCaption", {
+            startYear: floodRiskModel.trainingWindow.startYear,
+            endYear: floodRiskModel.trainingWindow.endYear,
+            multiplier: (floodRiskModel.topDecilePrecision / floodRiskModel.baseRate).toFixed(1),
+          })}
+        />
+      )}
+      {viewMode === "floodRisk" && floodRiskLoaded && !floodRiskAvailable && (
+        <p className="mb-3 text-sm text-gray-500">{t("severityMap.floodRiskUnavailable")}</p>
+      )}
+      {viewMode === "gdacs" && (
+        <InfoDisclosure summary={t("severityMap.gdacsSimpleCaption")} details={t("severityMap.gdacsCaption")} />
+      )}
       {viewMode === "earthquakes" && (
-        <p className="mb-3 text-xs text-gray-400">{t("severityMap.earthquakesCaption")}</p>
+        <InfoDisclosure summary={t("severityMap.earthquakesSimpleCaption")} details={t("severityMap.earthquakesCaption")} />
       )}
       {viewMode === "gdacs" && gdacsLoaded && !gdacsFetching && gdacsEvents.length === 0 && (
         <div className="mb-3">
@@ -434,15 +619,16 @@ export function AreaSeverityMap({
       {viewMode === "earthquakes" && earthquakes.length > 0 && earthquakeScope === "regional" && (
         <button
           onClick={() => setEarthquakeScope("sri-lanka")}
-          className="mb-3 block text-xs text-slate-600 hover:underline"
+          className="mb-1 block text-xs text-slate-600 hover:underline"
         >
           {t("severityMap.viewSriLankaOnly")}
         </button>
       )}
+      </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200" style={{ height }}>
         <MapContainer center={SRI_LANKA_CENTER} zoom={7} style={{ height: "100%", width: "100%" }}>
-          <MapViewController viewMode={viewMode} earthquakeScope={earthquakeScope} />
+          <MapViewController viewMode={viewMode} earthquakeScope={earthquakeScope} selectedCountry={selectedCountry} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -464,7 +650,7 @@ export function AreaSeverityMap({
                 layer.bindPopup(
                   `<strong>${feature.properties.district}</strong><br/>${t("severityMap.activeRequests", {
                     count,
-                  })}<br/>${LEVEL_LABEL[level]}`
+                  })}<br/>${TIER_SYMBOL[LEVEL_TIER[level] ?? "unknown"]} ${LEVEL_LABEL[level]}`
                 );
               }}
             />
@@ -488,11 +674,63 @@ export function AreaSeverityMap({
                     <br />
                     {t("severityMap.activeRequests", { count: area.requestCount })}
                     <br />
-                    {LEVEL_LABEL[area.level]}
+                    <TierLabel tier={LEVEL_TIER[area.level] ?? "unknown"}>{LEVEL_LABEL[area.level]}</TierLabel>
                   </Popup>
                 )}
               </CircleMarker>
             ))}
+          {viewMode === "floodRisk" && boundaries && (
+            <GeoJSON
+              key={`flood-risk-${floodRisk.map((f) => `${f.district}:${f.riskLevel}`).join(",")}`}
+              data={boundaries}
+              style={(feature?: Feature<any, DistrictBoundaryProps>): PathOptions => {
+                const match = floodRisk.find((f) => f.district === feature?.properties.district);
+                const color = FLOOD_RISK_COLOR[match?.riskLevel ?? "low"];
+                return { color, weight: 1.2, fillColor: color, fillOpacity: match ? 0.45 : 0.1 };
+              }}
+              onEachFeature={(feature: Feature<any, DistrictBoundaryProps>, layer: Layer) => {
+                if (!showPopups) return;
+                const match = floodRisk.find((f) => f.district === feature.properties.district);
+                if (!match) return;
+                layer.bindPopup(
+                  `<strong>${match.district}</strong><br/>` +
+                    `${t("severityMap.floodRiskProbability", { pct: Math.round(match.probability * 100) })}<br/>` +
+                    `${TIER_SYMBOL[FLOOD_RISK_TIER[match.riskLevel] ?? "unknown"]} ${t(`severityMap.floodRisk${match.riskLevel.charAt(0).toUpperCase()}${match.riskLevel.slice(1)}`)}<br/>` +
+                    (match.basis.historicalMonthFloodRate != null
+                      ? `${t("severityMap.floodRiskHistorical", { pct: Math.round(match.basis.historicalMonthFloodRate * 100) })}`
+                      : "")
+                );
+              }}
+            />
+          )}
+          {viewMode === "floodRisk" &&
+            !boundaries &&
+            floodRisk
+              .filter((f) => !f.error)
+              .map((f) => (
+                <CircleMarker
+                  key={f.district}
+                  center={[f.lat, f.lng]}
+                  radius={8}
+                  pathOptions={{
+                    color: FLOOD_RISK_COLOR[f.riskLevel],
+                    fillColor: FLOOD_RISK_COLOR[f.riskLevel],
+                    fillOpacity: 0.6,
+                  }}
+                >
+                  {showPopups && (
+                    <Popup>
+                      <strong>{f.district}</strong>
+                      <br />
+                      {t("severityMap.floodRiskProbability", { pct: Math.round(f.probability * 100) })}
+                      <br />
+                      <TierLabel tier={FLOOD_RISK_TIER[f.riskLevel] ?? "unknown"}>
+                        {t(`severityMap.floodRisk${f.riskLevel.charAt(0).toUpperCase()}${f.riskLevel.slice(1)}`)}
+                      </TierLabel>
+                    </Popup>
+                  )}
+                </CircleMarker>
+              ))}
           {viewMode === "gauges" &&
             gauges.map((g) => (
               <CircleMarker
@@ -514,7 +752,7 @@ export function AreaSeverityMap({
                     {t("severityMap.alertLevel")} {g.alertLevel ?? "—"} · {t("severityMap.minorFlood")}{" "}
                     {g.minorFloodLevel ?? "—"} · {t("severityMap.majorFlood")} {g.majorFloodLevel ?? "—"}
                     <br />
-                    {GAUGE_STATUS_LABEL[g.status]}
+                    <TierLabel tier={GAUGE_STATUS_TIER[g.status] ?? "unknown"}>{GAUGE_STATUS_LABEL[g.status]}</TierLabel>
                   </Popup>
                 )}
               </CircleMarker>
@@ -542,7 +780,9 @@ export function AreaSeverityMap({
                               ? t("severityMap.reservoirCapacity", { pct: r.effectiveStoragePercent })
                               : t("severityMap.reservoirCapacityUnknown")}
                             <br />
-                            {RESERVOIR_RISK_LABEL[r.riskLevel]}
+                            <TierLabel tier={RESERVOIR_RISK_TIER[r.riskLevel] ?? "unknown"}>
+                              {RESERVOIR_RISK_LABEL[r.riskLevel]}
+                            </TierLabel>
                             <br />
                             <em>{t("severityMap.reservoirsApproxNote")}</em>
                           </>
@@ -555,7 +795,9 @@ export function AreaSeverityMap({
                               : t("severityMap.reservoirCapacityUnknown")}
                             {r.levelMsl != null && ` · ${r.levelMsl} m MSL`}
                             <br />
-                            {RESERVOIR_RISK_LABEL[r.riskLevel]}
+                            <TierLabel tier={RESERVOIR_RISK_TIER[r.riskLevel] ?? "unknown"}>
+                              {RESERVOIR_RISK_LABEL[r.riskLevel]}
+                            </TierLabel>
                           </>
                         )}
                       </Popup>
@@ -563,6 +805,13 @@ export function AreaSeverityMap({
                   </CircleMarker>
                 );
               })}
+          {(viewMode === "gdacs" || viewMode === "earthquakes") && selectedCountry && (
+            <GeoJSON
+              key={selectedCountry.properties.name}
+              data={selectedCountry as any}
+              style={{ color: "#7c3aed", weight: 3, fillColor: "#7c3aed", fillOpacity: 0.08, dashArray: "6" }}
+            />
+          )}
           {viewMode === "gdacs" &&
             gdacsEvents.map((event) => {
               const color = GDACS_ALERT_COLOR[event.alertLevel || ""] || "#6b7280";
@@ -588,6 +837,14 @@ export function AreaSeverityMap({
                           <br />
                           {event.fromDate ? new Date(event.fromDate).toLocaleDateString() : "—"} –{" "}
                           {event.toDate ? new Date(event.toDate).toLocaleDateString() : "—"}
+                          {event.alertLevel && (
+                            <>
+                              <br />
+                              <TierLabel tier={GDACS_TIER[event.alertLevel] ?? "unknown"}>
+                                {event.alertLevel}
+                              </TierLabel>
+                            </>
+                          )}
                         </Popup>
                       )}
                     </CircleMarker>
@@ -608,7 +865,9 @@ export function AreaSeverityMap({
                   {showPopups && (
                     <Popup>
                       <strong>
-                        M {eq.magnitude.toFixed(1)} — {eq.place}
+                        <TierLabel tier={magnitudeTier(eq.magnitude)}>
+                          M {eq.magnitude.toFixed(1)} — {eq.place}
+                        </TierLabel>
                       </strong>
                       <br />
                       {new Date(eq.time).toLocaleString()}

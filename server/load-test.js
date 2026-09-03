@@ -62,8 +62,8 @@ async function createAccount(role, i, extra = {}) {
 
 async function timedFetch(path, token, options = {}) {
   const start = performance.now();
-  let status = 0;
-  let body = null;
+  let status;
+  let body;
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,

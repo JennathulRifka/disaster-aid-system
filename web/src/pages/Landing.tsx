@@ -8,6 +8,9 @@ import { StatCard } from "@/components/StatCard";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Footer } from "@/components/Footer";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { AccessibilityControls } from "@/components/AccessibilityControls";
+import { MapWalkthroughModal } from "@/components/MapWalkthroughModal";
+import { useMapWalkthrough } from "@/hooks/useMapWalkthrough";
 import { apiFetch } from "@/lib/api";
 
 interface Stats {
@@ -36,6 +39,7 @@ export default function Landing() {
   const [scrolled, setScrolled] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [weather, setWeather] = useState<WeatherCity[]>([]);
+  const walkthrough = useMapWalkthrough();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -50,6 +54,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-white">
+      <MapWalkthroughModal open={walkthrough.open} onClose={walkthrough.dismiss} />
       <EmergencyBanner />
       <header
         className={`sticky top-0 z-10 flex items-center justify-between bg-white/90 px-8 py-6 backdrop-blur transition-shadow ${
@@ -59,6 +64,7 @@ export default function Landing() {
         <h1 className="text-lg font-semibold text-gray-900">{t("landing.brand")}</h1>
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
+          <AccessibilityControls onShowHelp={walkthrough.show} />
           <Link to="/login" className="rounded px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
             {t("common.signIn")}
           </Link>
@@ -158,25 +164,30 @@ export default function Landing() {
             </Link>
           </div>
           {weather.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-3 overflow-x-auto">
-              {weather
-                .filter((w) => !w.error)
-                .map((w) => (
-                  <div
-                    key={w.city}
-                    className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-3 text-xs text-gray-700"
-                  >
-                    {w.icon && (
-                      <img
-                        src={`https://openweathermap.org/img/wn/${w.icon}.png`}
-                        alt={w.description || ""}
-                        className="h-6 w-6"
-                      />
-                    )}
-                    <span className="font-medium">{w.city}</span>
-                    <span>{w.tempC}°C</span>
-                  </div>
-                ))}
+            <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {t("landing.currentConditions")}
+              </h4>
+              <div className="flex flex-wrap gap-3 overflow-x-auto">
+                {weather
+                  .filter((w) => !w.error)
+                  .map((w) => (
+                    <div
+                      key={w.city}
+                      className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-3 text-xs text-gray-700"
+                    >
+                      {w.icon && (
+                        <img
+                          src={`https://openweathermap.org/img/wn/${w.icon}.png`}
+                          alt={w.description || ""}
+                          className="h-6 w-6"
+                        />
+                      )}
+                      <span className="font-medium">{w.city}</span>
+                      <span>{w.tempC}°C</span>
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
           <AreaSeverityMap height="420px" extraLayers />

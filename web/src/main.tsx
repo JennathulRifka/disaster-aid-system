@@ -6,6 +6,9 @@ import { AuthProvider } from "./context/AuthContext";
 import "./i18n";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
+import { applyStoredAccessibilityPrefs } from "./lib/accessibility";
+
+applyStoredAccessibilityPrefs();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -327,7 +327,7 @@ router.get("/by-request/:requestId", requireAuth, requireRole("victim"), async (
     // Never send confirmToken to the victim's own client — it's shown to
     // them via QR code by whoever has the goods, not handed over in the API.
     const deliveries = snapshot.docs.map((doc) => {
-      const { confirmToken, ...rest } = doc.data();
+      const { confirmToken: _confirmToken, ...rest } = doc.data();
       return { id: doc.id, ...rest };
     });
     return res.json(deliveries);

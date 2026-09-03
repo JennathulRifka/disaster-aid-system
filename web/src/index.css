@@ -1,3 +1,25 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* High-contrast mode (see src/lib/accessibility.ts) — a targeted boost, not a
+   full WCAG-AAA palette: forces this app's most common low-contrast Tailwind
+   utility classes (light grays for secondary text, light borders) to pure
+   black, and underlines links so they don't rely on color alone. */
+html.high-contrast body {
+  background: #ffffff;
+  color: #000000;
+}
+html.high-contrast .text-gray-400,
+html.high-contrast .text-gray-500,
+html.high-contrast .text-gray-600 {
+  color: #000000 !important;
+}
+html.high-contrast .border-gray-100,
+html.high-contrast .border-gray-200,
+html.high-contrast .border-gray-300 {
+  border-color: #000000 !important;
+}
+html.high-contrast a {
+  text-decoration: underline;
+}

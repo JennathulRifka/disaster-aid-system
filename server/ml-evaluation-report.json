@@ -1,0 +1,108 @@
+{
+  "generatedAt": "2026-09-03T10:06:33.220Z",
+  "dataIntegrity": {
+    "totalRecords": 8182,
+    "yearRange": [
+      1981,
+      2020
+    ],
+    "unmappedDistricts": [],
+    "distinctDistrictsInData": 25
+  },
+  "model": {
+    "trainedAt": "2026-09-03T10:06:33.214Z",
+    "trainingWindow": {
+      "startYear": 1981,
+      "endYear": 2020
+    },
+    "sampleCount": 12000,
+    "positiveCount": 1175,
+    "inSampleAccuracy": 0.90275,
+    "topDecilePrecision": 0.37583333333333335,
+    "baseRate": 0.09791666666666667
+  },
+  "confusionMatrix": {
+    "threshold": 0.5,
+    "tp": 146,
+    "fp": 138,
+    "tn": 10687,
+    "fn": 1029,
+    "total": 12000,
+    "precision": 0.5140845070422535,
+    "recall": 0.12425531914893617,
+    "f1": 0.20013708019191226,
+    "accuracy": 0.90275,
+    "baselineAccuracy": 0.9020833333333333
+  },
+  "sanityChecks": [
+    {
+      "name": "Ratnapura (May) historical flood rate exceeds Mannar (February)",
+      "pass": true,
+      "detail": "Ratnapura/May = 0.475, Mannar/February = 0.025"
+    },
+    {
+      "name": "Every district-month historical base rate is a valid probability [0,1]",
+      "pass": true
+    },
+    {
+      "name": "All trained weights and the bias are finite numbers (no NaN/Infinity — training didn't diverge)",
+      "pass": true,
+      "detail": "weights = [0.8042, 0.2817, 0.0455, 0.0308, 0.3898], bias = -2.6806"
+    }
+  ],
+  "topRiskiestDistrictMonths": [
+    {
+      "district": "Ampara",
+      "month": 12,
+      "rate": 0.625
+    },
+    {
+      "district": "Batticaloa",
+      "month": 12,
+      "rate": 0.5
+    },
+    {
+      "district": "Polonnaruwa",
+      "month": 12,
+      "rate": 0.475
+    },
+    {
+      "district": "Ratnapura",
+      "month": 5,
+      "rate": 0.475
+    },
+    {
+      "district": "Kalutara",
+      "month": 5,
+      "rate": 0.4
+    }
+  ],
+  "topSafestDistrictMonths": [
+    {
+      "district": "Monaragala",
+      "month": 8,
+      "rate": 0
+    },
+    {
+      "district": "Monaragala",
+      "month": 6,
+      "rate": 0
+    },
+    {
+      "district": "Badulla",
+      "month": 8,
+      "rate": 0
+    },
+    {
+      "district": "Polonnaruwa",
+      "month": 9,
+      "rate": 0
+    },
+    {
+      "district": "Polonnaruwa",
+      "month": 8,
+      "rate": 0
+    }
+  ],
+  "overallPass": true
+}
