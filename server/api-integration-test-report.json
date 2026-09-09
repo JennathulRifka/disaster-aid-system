@@ -1,0 +1,392 @@
+{
+  "generatedAt": "2026-09-03T11:20:30.072Z",
+  "total": 48,
+  "passed": 48,
+  "failed": 0,
+  "results": [
+    {
+      "name": "GET /api/users/me — no token rejected",
+      "expected": [
+        401
+      ],
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "name": "GET /api/users/me — happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "GET /api/users/volunteers — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/users/volunteers — admin happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "PATCH /api/users/availability — non-volunteer rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "POST /api/users/profile — victim missing nic/homeAddress rejected",
+      "expected": [
+        400
+      ],
+      "actual": 400,
+      "pass": true
+    },
+    {
+      "name": "POST /api/requests — non-victim rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "POST /api/requests — missing required fields rejected",
+      "expected": [
+        400
+      ],
+      "actual": 400,
+      "pass": true
+    },
+    {
+      "name": "POST /api/requests — victim happy path",
+      "expected": [
+        201
+      ],
+      "actual": 201,
+      "pass": true
+    },
+    {
+      "name": "GET /api/requests — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/requests — no token rejected",
+      "expected": [
+        401
+      ],
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "name": "GET /api/requests/mine — victim happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "PATCH /api/requests/:id/verify — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "POST /api/donations — non-donor rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "POST /api/donations — donor happy path",
+      "expected": [
+        201
+      ],
+      "actual": 201,
+      "pass": true
+    },
+    {
+      "name": "GET /api/donations — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/donations/mine — donor happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "POST /api/deliveries — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/deliveries/mine — non-volunteer rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/deliveries/mine — volunteer happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "GET /api/deliveries/by-request/:id — victim happy path (own request)",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "GET /api/stats — public, no token needed",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "GET /api/stats/by-area — public, no token needed",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "GET /api/external/alerts — public",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "GET /api/external/weather — public",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "POST /api/external/flood-risk/retrain — no token rejected",
+      "expected": [
+        401
+      ],
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "name": "POST /api/external/flood-risk/retrain — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/categories — no token rejected",
+      "expected": [
+        401
+      ],
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "name": "GET /api/categories — any authed role happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "POST /api/categories — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/broadcasts/active — public",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "POST /api/broadcasts — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/audit-log — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/audit-log — admin happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "GET /api/active-districts — public",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "POST /api/active-districts — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "POST /api/active-districts — invalid district name rejected",
+      "expected": [
+        400
+      ],
+      "actual": 400,
+      "pass": true
+    },
+    {
+      "name": "GET /api/water-alerts/settings — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/water-alerts/settings — admin happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "POST /api/sos — no token rejected",
+      "expected": [
+        401
+      ],
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "name": "POST /api/sos — missing type/location rejected",
+      "expected": [
+        400
+      ],
+      "actual": 400,
+      "pass": true
+    },
+    {
+      "name": "POST /api/sos — happy path (any authed role)",
+      "expected": [
+        201
+      ],
+      "actual": 201,
+      "pass": true
+    },
+    {
+      "name": "PATCH /api/sos/:id/status — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "POST /api/community-reports — non-volunteer rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/community-reports — non-admin rejected",
+      "expected": [
+        403
+      ],
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "GET /api/community-reports/verified — public",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "GET /api/chats/mine — no token rejected",
+      "expected": [
+        401
+      ],
+      "actual": 401,
+      "pass": true
+    },
+    {
+      "name": "GET /api/chats/mine — happy path",
+      "expected": [
+        200
+      ],
+      "actual": 200,
+      "pass": true
+    }
+  ]
+}

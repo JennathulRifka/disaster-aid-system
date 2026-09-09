@@ -9,6 +9,8 @@
     "train-flood-model": "node scripts/train-flood-risk-model.js",
     "backup-firestore": "node scripts/backup-firestore.js",
     "evaluate-flood-model": "node scripts/evaluate-flood-model.js",
+    "test:api-integration": "node scripts/test-api-integration.js",
+    "test:firestore-rules": "node scripts/test-firestore-rules.js",
     "lint": "eslint .",
     "test": "vitest run",
     "test:report": "vitest run --reporter=verbose > test-results.txt"

@@ -30,8 +30,7 @@ export default function DonorDonationForm() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Record<string, CategoryLimit>>({});
   const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [category, setCategory] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [items, setItems] = useState<Record<string, string>>({});
   const [deliveryMethod, setDeliveryMethod] = useState<"self" | "volunteer">("volunteer");
   const [notes, setNotes] = useState("");
   const [locationStatus, setLocationStatus] = useState<"idle" | "capturing" | "captured" | "error">("idle");
@@ -42,13 +41,27 @@ export default function DonorDonationForm() {
 
   useEffect(() => {
     apiFetch("/api/categories")
-      .then((data: Record<string, CategoryLimit>) => {
-        setCategories(data);
-        const firstKey = Object.keys(data)[0];
-        if (firstKey) setCategory(firstKey);
-      })
+      .then(setCategories)
       .finally(() => setCategoriesLoading(false));
   }, []);
+
+  const categoryKeys = Object.keys(categories);
+
+  function toggleCategory(category: string) {
+    setItems((prev) => {
+      const next = { ...prev };
+      if (category in next) {
+        delete next[category];
+      } else {
+        next[category] = "";
+      }
+      return next;
+    });
+  }
+
+  function setItemQuantity(category: string, value: string) {
+    setItems((prev) => ({ ...prev, [category]: value }));
+  }
 
   function captureLocation() {
     setLocationStatus("capturing");
@@ -72,17 +85,35 @@ export default function DonorDonationForm() {
       setError(t("donorDonationForm.errorNoLocation"));
       return;
     }
-    if (!quantity) {
+    const selectedCategories = Object.keys(items);
+    if (selectedCategories.length === 0) {
+      setError(t("donorDonationForm.selectAtLeastOne"));
+      return;
+    }
+    if (selectedCategories.some((category) => !items[category].trim())) {
       setError(t("donorDonationForm.errorNoQuantity"));
       return;
     }
     setSubmitting(true);
     try {
-      await apiFetch("/api/donations", {
-        method: "POST",
-        body: JSON.stringify({ category, quantity, location, deliveryMethod, notes }),
-      });
-      navigate("/donations/mine");
+      // One donation per selected category — donations have always been
+      // single-category documents throughout this app (matching, delivery
+      // tracking, and chat all key off one category per donation), so a
+      // multi-item drop-off registers as several donations sharing the same
+      // location/delivery method/notes, rather than a new multi-item schema.
+      const results = await Promise.allSettled(
+        selectedCategories.map((category) =>
+          apiFetch("/api/donations", {
+            method: "POST",
+            body: JSON.stringify({ category, quantity: items[category].trim(), location, deliveryMethod, notes }),
+          })
+        )
+      );
+      const anyFailed = results.some((r) => r.status === "rejected");
+      if (anyFailed && results.every((r) => r.status === "rejected")) {
+        throw (results[0] as PromiseRejectedResult).reason;
+      }
+      navigate("/donations/mine", anyFailed ? { state: { partialFailure: true } } : undefined);
     } catch (err: any) {
       setError(err.message || t("donorDonationForm.errorGeneric"));
     } finally {
@@ -98,32 +129,41 @@ export default function DonorDonationForm() {
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5 rounded-xl bg-white p-6 shadow-sm">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">{t("donorDonationForm.category")}</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              {t("donorDonationForm.whatAreYouDonating")}
+            </label>
+            <p className="mb-2 text-xs text-gray-500">{t("donorDonationForm.whatAreYouDonatingHint")}</p>
             {categoriesLoading ? (
               <p className="text-sm text-gray-500">{t("common.loading")}</p>
             ) : (
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-              >
-                {Object.entries(categories).map(([key, c]) => (
-                  <option key={key} value={key}>
-                    {t(`categories.${key}`, c.label)}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                {categoryKeys.map((category) => {
+                  const c = categories[category];
+                  const selected = category in items;
+                  return (
+                    <div
+                      key={category}
+                      className={`flex items-center justify-between gap-3 rounded border px-3 py-2 ${
+                        selected ? "border-orange-600 bg-orange-50" : "border-gray-300"
+                      }`}
+                    >
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" checked={selected} onChange={() => toggleCategory(category)} />
+                        {t(`categories.${category}`, c.label)}
+                      </label>
+                      {selected && (
+                        <input
+                          value={items[category]}
+                          onChange={(e) => setItemQuantity(category, e.target.value)}
+                          placeholder={t("donorDonationForm.quantityPlaceholder")}
+                          className="w-36 rounded border border-gray-300 px-2 py-1 text-sm"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">{t("donorDonationForm.quantity")}</label>
-            <input
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-              placeholder={t("donorDonationForm.quantityPlaceholder")}
-            />
           </div>
 
           <div>

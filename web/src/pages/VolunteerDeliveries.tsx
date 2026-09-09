@@ -27,8 +27,6 @@ const NEXT_STATUS: Record<string, string> = {
   picked_up: "delivered",
 };
 
-const REPORT_TYPES = ["road_closure", "water_level", "other"] as const;
-
 export default function VolunteerDeliveries() {
   const { t } = useTranslation();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -39,15 +37,6 @@ export default function VolunteerDeliveries() {
   const [savingAvailability, setSavingAvailability] = useState(false);
   const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"idle" | "capturing" | "error">("idle");
-  const [reportType, setReportType] = useState<"road_closure" | "water_level" | "other">("road_closure");
-  const [reportDescription, setReportDescription] = useState("");
-  const [reportLocation, setReportLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [reportLocationStatus, setReportLocationStatus] = useState<"idle" | "capturing" | "captured" | "error">(
-    "idle"
-  );
-  const [submittingReport, setSubmittingReport] = useState(false);
-  const [reportSent, setReportSent] = useState(false);
-  const [reportError, setReportError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -144,41 +133,6 @@ export default function VolunteerDeliveries() {
       await load();
     } finally {
       setActingOn(null);
-    }
-  }
-
-  function captureReportLocation() {
-    setReportLocationStatus("capturing");
-    if (!navigator.geolocation) {
-      setReportLocationStatus("error");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setReportLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setReportLocationStatus("captured");
-      },
-      () => setReportLocationStatus("error")
-    );
-  }
-
-  async function submitReport() {
-    if (!reportLocation || !reportDescription.trim()) return;
-    setSubmittingReport(true);
-    setReportError("");
-    try {
-      await apiFetch("/api/community-reports", {
-        method: "POST",
-        body: JSON.stringify({ type: reportType, description: reportDescription.trim(), location: reportLocation }),
-      });
-      setReportSent(true);
-      setReportDescription("");
-      setReportLocation(null);
-      setReportLocationStatus("idle");
-    } catch (err: any) {
-      setReportError(err.message || t("volunteerDeliveries.reportFailed"));
-    } finally {
-      setSubmittingReport(false);
     }
   }
 
@@ -314,70 +268,6 @@ export default function VolunteerDeliveries() {
           ))}
         </div>
       )}
-
-      <div className="mt-8 max-w-xl rounded-xl border border-gray-200 bg-white p-6">
-        <h2 className="text-sm font-semibold text-gray-900">{t("volunteerDeliveries.reportSectionTitle")}</h2>
-        <p className="mt-1 text-xs text-gray-500">{t("volunteerDeliveries.reportSectionDesc")}</p>
-
-        {reportSent ? (
-          <div className="mt-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-            {t("volunteerDeliveries.reportSubmitted")}
-            <button onClick={() => setReportSent(false)} className="ml-2 underline">
-              {t("volunteerDeliveries.reportAnother")}
-            </button>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-3">
-            <select
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value as typeof reportType)}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-            >
-              {REPORT_TYPES.map((key) => (
-                <option key={key} value={key}>
-                  {t(`volunteerDeliveries.reportType.${key}`)}
-                </option>
-              ))}
-            </select>
-            <textarea
-              value={reportDescription}
-              onChange={(e) => setReportDescription(e.target.value)}
-              rows={2}
-              placeholder={t("volunteerDeliveries.reportDescPlaceholder")}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-            />
-            <div className="text-sm">
-              {reportLocationStatus === "idle" && (
-                <button onClick={captureReportLocation} className="text-slate-700 underline">
-                  {t("volunteerDeliveries.captureMyLocation")}
-                </button>
-              )}
-              {reportLocationStatus === "capturing" && (
-                <p className="text-gray-500">{t("volunteerDeliveries.capturingLocation")}</p>
-              )}
-              {reportLocationStatus === "captured" && (
-                <p className="text-green-700">{t("volunteerDeliveries.locationCaptured")}</p>
-              )}
-              {reportLocationStatus === "error" && (
-                <div className="flex items-center gap-2">
-                  <p className="text-red-600">{t("volunteerDeliveries.locationErrorGeneric")}</p>
-                  <button onClick={captureReportLocation} className="text-slate-700 underline">
-                    {t("volunteerDeliveries.tryAgain")}
-                  </button>
-                </div>
-              )}
-            </div>
-            {reportError && <p className="text-xs text-red-600">{reportError}</p>}
-            <button
-              onClick={submitReport}
-              disabled={!reportLocation || !reportDescription.trim() || submittingReport}
-              className="w-full rounded bg-orange-600 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
-            >
-              {submittingReport ? t("volunteerDeliveries.submitting") : t("volunteerDeliveries.submitReport")}
-            </button>
-          </div>
-        )}
-      </div>
 
       {activeChatId && <ChatModal chatId={activeChatId} onClose={() => setActiveChatId(null)} />}
     </DashboardLayout>

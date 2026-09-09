@@ -37,7 +37,10 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { labelKey: "nav.auditLog", path: "/admin/audit-log" },
     { labelKey: "nav.volunteerWorkload", path: "/admin/volunteer-workload" },
   ],
-  volunteer: [{ labelKey: "nav.myDeliveries", path: "/deliveries/mine" }],
+  volunteer: [
+    { labelKey: "nav.myDeliveries", path: "/deliveries/mine" },
+    { labelKey: "nav.reportCondition", path: "/community-report" },
+  ],
 };
 
 export function DashboardLayout({ children }: { children: ReactNode }) {

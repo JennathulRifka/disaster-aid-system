@@ -142,6 +142,7 @@
     "volunteerWorkload": "Volunteer Workload",
     "dashboard": "Dashboard",
     "myDeliveries": "My Deliveries",
+    "reportCondition": "Report Condition",
     "settings": "Settings"
   },
   "victimRequestForm": {
@@ -184,8 +185,11 @@
     "title": "Register a Donation",
     "subtitle": "Tell us what you're able to give — we'll match it to a verified request nearby.",
     "category": "Category",
+    "whatAreYouDonating": "What are you donating?",
+    "whatAreYouDonatingHint": "Select everything you're giving in this drop-off — pick as many categories as you like and enter a quantity for each.",
     "quantity": "Quantity (e.g. \"50 kg rice\", \"100 bottles\")",
     "quantityPlaceholder": "50 kg rice",
+    "selectAtLeastOne": "Select at least one item you're donating.",
     "deliveryMethodLabel": "How will this reach the recipient?",
     "findVolunteer": "Find a volunteer",
     "findVolunteerDesc": "A volunteer picks up and delivers it.",
@@ -203,8 +207,9 @@
     "registering": "Registering...",
     "registerButton": "Register Donation",
     "errorNoLocation": "Please capture a pickup location before submitting.",
-    "errorNoQuantity": "Please enter a quantity.",
-    "errorGeneric": "Failed to register donation."
+    "errorNoQuantity": "Please enter a quantity for each item you selected.",
+    "errorGeneric": "Failed to register donation.",
+    "errorPartial": "Some items failed to register — please check My Donations and try the missing ones again."
   },
   "donorMyDonations": {
     "title": "My Donations",
@@ -240,9 +245,11 @@
       "accepted": "Mark as picked up",
       "picked_up": "Mark as delivered"
     },
-    "rejectPrompt": "Optional: why are you rejecting this? (leave blank to skip)",
-    "reportSectionTitle": "Report a road closure or water condition",
-    "reportSectionDesc": "Seen a blocked road or rising water while out on deliveries? Report it here — an admin reviews and verifies it before it's shown on the situation map or the public severity map.",
+    "rejectPrompt": "Optional: why are you rejecting this? (leave blank to skip)"
+  },
+  "volunteerCommunityReport": {
+    "title": "Report a road closure or water condition",
+    "subtitle": "Seen a blocked road or rising water while out on deliveries? Report it here — an admin reviews and verifies it before it's shown on the situation map or the public severity map.",
     "reportSubmitted": "Report submitted — thanks. It'll show up on the map once an admin verifies it.",
     "reportAnother": "Report another",
     "reportType": {
@@ -358,13 +365,13 @@
     "gdacsTitle": "Global Disaster Alerts (GDACS)",
     "gdacsSimpleCaption": "Alerts about major disasters happening around the world — cyclones, earthquakes, floods — shown here when they could affect Sri Lanka.",
     "gdacsCaption": "Tropical cyclone tracking and general disaster events from the Global Disaster Alert and Coordination System (EC Joint Research Centre), filtered to ones relevant to Sri Lanka.",
-    "gdacsNoEvents": "No GDACS-tracked events relevant to Sri Lanka right now.",
+    "gdacsNoEvents": "No disaster alerts for Sri Lanka right now — that's a good sign.",
     "gdacsNoEventsGlobal": "No current GDACS events found.",
     "earthquakesTitle": "Regional Seismic Activity — Tsunami Risk Indicator",
     "earthquakesSimpleCaption": "Recent earthquakes in the nearby ocean that could signal a tsunami risk for Sri Lanka's coast.",
     "earthquakesCaption": "Recent magnitude 4.0+ earthquakes from the US Geological Survey, across the Indian Ocean / Bay of Bengal / Sumatra subduction zone — the region that produced the 2004 Indian Ocean tsunami. Sri Lanka itself sits on stable crust and rarely has local seismic activity; this tracks the wider zone as an early-context indicator, not a Sri Lanka earthquake feed.",
     "earthquakesNoEvents": "No magnitude 4.0+ earthquakes in the region in the last 30 days.",
-    "earthquakesNoEventsSriLanka": "No magnitude 4.0+ earthquakes within Sri Lanka's immediate waters in the last 30 days — expected most days.",
+    "earthquakesNoEventsSriLanka": "No earthquakes near Sri Lanka in the last 30 days — that's normal.",
     "viewGlobalEvents": "View regional events",
     "viewSriLankaOnly": "Show Sri Lanka only",
     "earthquakesTsunamiFlag": "Tsunami potential flagged",

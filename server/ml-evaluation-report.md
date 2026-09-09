@@ -1,7 +1,7 @@
 # Flood Risk Model — Test Results
 
-Generated: 2026-09-03T10:06:33.220Z
-Model trained: 2026-09-03T10:06:33.214Z (training window 1981-2020)
+Generated: 2026-09-04T16:54:25.948Z
+Model trained: 2026-09-04T16:54:24.568Z (training window 1981-2020)
 
 ## 1. Data integrity
 
@@ -36,6 +36,16 @@ Model trained: 2026-09-03T10:06:33.214Z (training window 1981-2020)
 | Baseline accuracy ("always predict no flood") | 90.2% |
 
 **Reading this honestly**: raw accuracy is barely above the always-predict-negative baseline, because only ~10% of district-months in the training data ever had a reported flood — this is the same class-imbalance issue already documented for top-decile precision. Precision/recall/F1 at the 0.5 threshold are included here for completeness (a standard classification report), but the model's real, demonstrated skill is in *ranking* risk (top-decile precision, 3.8x the base rate), not in a binary yes/no call at 0.5.
+
+## 3b. ROC curve and AUC
+
+**AUC = 0.825** (0.5 = no better than random guessing, 1.0 = perfect ranking).
+
+Unlike the confusion matrix above, ROC/AUC doesn't depend on picking one threshold — it evaluates the model's ability to rank a genuinely-flooded district-month above a non-flooded one, across every possible threshold at once. This is the standard way classification models are compared when the decision threshold is a design choice rather than a fixed requirement, and it's the metric most directly comparable to what a Random Forest or LSTM classifier in this same evaluation would report.
+
+![ROC curve](roc-curve.svg)
+
+*(The dashed diagonal is the random-guess baseline (AUC = 0.5); the further the real curve bows toward the top-left corner, the better the model separates flood from non-flood months.)*
 
 ## 4. Domain-knowledge sanity checks
 

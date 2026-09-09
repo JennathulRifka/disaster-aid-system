@@ -79,7 +79,26 @@ Copy this table once per participant.
 2. **Verify/approve** one request (or reject one, and see what they notice about the flagged/duplicate/medicine-review indicators if any appear).
 3. **Match a donation** to a request, then **assign a volunteer** to deliver it.
 4. Find the **transparency/KPI overview** — ask them what it's telling them, in their own words.
-5. *(Optional)* Open the **Situation Map** and try switching between its different view modes (Requests / Areas Affected / River Gauges / GDACS / Earthquakes).
+5. *(Optional)* Open the **Situation Map** and try switching between its different view modes (Requests / Areas Affected / River Gauges / Reservoirs / Flood Risk Forecast / GDACS / Earthquakes) — ask them to **search for and zoom to a specific district** using the search box.
+
+---
+
+## Public visitor scenario (no account needed)
+
+**Added because this is the one surface every participant can test without a login, and the one that's had the most direct usability work done on it — worth deliberately checking whether that work actually landed for someone seeing it cold.**
+
+**Setup:** Open the app at the landing page, **logged out**, with a cleared browser (or a private/incognito window) so the one-time onboarding walkthrough actually triggers — if it's already been dismissed on that browser, clear `localStorage` first or the participant will miss Task 2.
+
+**Scenario framing:** *"You're a member of the public who's heard there's a website with live information about disaster-affected areas in Sri Lanka. You've just opened it for the first time."*
+
+1. **Without any instruction from you**, see whether they notice and interact with the **onboarding walkthrough** that opens automatically. Note whether they read it, skip it, or click through — and whether they can later explain what the colored map markers mean.
+2. Ask them to find **flood risk information for a specific district** (name one, e.g. "What's the flood risk in Ratnapura?") using the map's tabs and the **district/country search box**.
+3. Ask them to explain, in their own words, what the **colored icons on the map legend** mean (checkmark / warning triangle / exclamation mark) — this checks whether the icon+color+text pairing actually communicates risk level without needing to read a wall of text.
+4. Point out the **"How is this calculated?"** expandable link under one of the captions (e.g. Flood Risk Forecast or GDACS) and ask if they'd have found it themselves.
+5. Show them the **"Aa" accessibility control** in the header — ask them to try increasing the text size and turning on high contrast, then ask if either felt useful.
+6. *(Optional)* Ask them to switch the site to **Sinhala or Tamil** using the language switcher and see if anything looks broken or confusing in that language.
+
+This scenario directly tests the accessibility pass (plain-language captions, icon+color+text legends, the onboarding walkthrough, and the text-size/contrast toggle) built in response to supervisor feedback that the map wasn't user-friendly for people of all knowledge levels — the debrief question "was there anything you expected the system to do that it didn't?" is worth asking again specifically about this scenario.
 
 ---
 

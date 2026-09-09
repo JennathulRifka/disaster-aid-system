@@ -1,0 +1,275 @@
+{
+  "generatedAt": "2026-09-03T10:42:20.775Z",
+  "total": 44,
+  "passed": 44,
+  "failed": 0,
+  "results": [
+    {
+      "name": "owner reads own profile",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "non-owner reads another user's profile",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "admin reads another user's profile directly (NOT via the Express API)",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true,
+      "note": "by design: the rule grants owner-only read, no admin exception — admin access to other profiles goes through the Express API (GET /api/users/volunteers etc.), which uses the Admin SDK and bypasses rules entirely"
+    },
+    {
+      "name": "unauthenticated read of a profile",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "owner can write own profile",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "non-owner cannot write another user's profile",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "owning victim reads own request",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "a different, unrelated victim reads someone else's request",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "donor reads a request that isn't theirs",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "admin reads any request",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "non-admin cannot write a request directly",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "admin can write a request directly",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "owning donor reads own donation",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "unrelated volunteer reads someone else's donation",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "admin reads any donation",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "non-admin cannot write a donation directly",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "assigned volunteer reads own delivery",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "the owning donor (via the linked donation) reads the delivery",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "admin reads any delivery",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "a completely unrelated victim (not the actual request's victim) can also read this delivery",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true,
+      "note": "REAL FINDING: the rule is `userRole() in [\"admin\",\"victim\"]`, not \"this delivery's own victim\" — ANY authenticated victim account can read ANY delivery document, not just the one tied to their own request. Flagged directly, not silently fixed — see the report notes."
+    },
+    {
+      "name": "an unrelated volunteer (not assigned, not the owning donor) cannot read this delivery",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "reporter reads own SOS report",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "unrelated user cannot read someone else's SOS report",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "admin reads any SOS report",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "non-admin cannot update an SOS report's status directly",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "admin reads a case note",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "non-admin (even the request's own victim) cannot read a case note",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "non-admin cannot write a case note directly",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "unauthenticated user reads the active broadcast",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "non-admin cannot post/edit a broadcast directly",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "admin can write a broadcast directly",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "unauthenticated user reads an active district",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "non-admin cannot activate/deactivate a district directly",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "any signed-in role reads a category limit",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "unauthenticated user cannot read category limits",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "a chat participant (donor) reads the chat",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "the other chat participant (volunteer) reads the chat",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "a non-participant cannot read the chat",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "admin reads any chat",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "even a participant cannot write to the chat doc directly",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "even admin cannot write to the chat doc directly via REST",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true,
+      "note": "by design: `allow write: if false` applies unconditionally — all chat writes must go through the chats API (server/src/routes/chats.js) so business rules (locked chats, mutual consent) stay in one place; the Admin SDK bypasses this rule for the API's own writes, but a direct client REST call from any role, including admin, is correctly blocked"
+    },
+    {
+      "name": "a participant of the parent chat reads a message",
+      "expectation": "allow",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "a non-participant cannot read a message",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    },
+    {
+      "name": "no one can write a chat message directly via REST",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true
+    }
+  ]
+}

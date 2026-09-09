@@ -57,20 +57,20 @@ export default function Landing() {
       <MapWalkthroughModal open={walkthrough.open} onClose={walkthrough.dismiss} />
       <EmergencyBanner />
       <header
-        className={`sticky top-0 z-10 flex items-center justify-between bg-white/90 px-8 py-6 backdrop-blur transition-shadow ${
+        className={`sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-white/90 px-4 py-4 backdrop-blur transition-shadow sm:px-8 sm:py-6 ${
           scrolled ? "shadow-sm" : ""
         }`}
       >
-        <h1 className="text-lg font-semibold text-gray-900">{t("landing.brand")}</h1>
-        <div className="flex items-center gap-3">
+        <h1 className="whitespace-nowrap text-base font-semibold text-gray-900 sm:text-lg">{t("landing.brand")}</h1>
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <LanguageSwitcher />
           <AccessibilityControls onShowHelp={walkthrough.show} />
-          <Link to="/login" className="rounded px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+          <Link to="/login" className="rounded px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 sm:px-4 sm:py-2">
             {t("common.signIn")}
           </Link>
           <Link
             to="/register"
-            className="rounded bg-orange-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-700 hover:shadow"
+            className="rounded bg-orange-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-orange-700 hover:shadow sm:px-4 sm:py-2"
           >
             {t("common.getStarted")}
           </Link>

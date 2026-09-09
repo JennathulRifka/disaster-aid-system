@@ -13,6 +13,7 @@ import AdminRequests from "@/pages/AdminRequests";
 import AdminDonations from "@/pages/AdminDonations";
 import VolunteerDeliveries from "@/pages/VolunteerDeliveries";
 import VolunteerNavigation from "@/pages/VolunteerNavigation";
+import VolunteerCommunityReport from "@/pages/VolunteerCommunityReport";
 import PublicSeverityMap from "@/pages/PublicSeverityMap";
 import SituationMap from "@/pages/SituationMap";
 import AdminCategories from "@/pages/AdminCategories";
@@ -202,6 +203,14 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["volunteer"]}>
             <VolunteerNavigation />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/community-report"
+        element={
+          <ProtectedRoute allowedRoles={["volunteer"]}>
+            <VolunteerCommunityReport />
           </ProtectedRoute>
         }
       />

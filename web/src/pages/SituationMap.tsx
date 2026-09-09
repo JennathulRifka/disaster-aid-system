@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { MapContainer, TileLayer, CircleMarker, GeoJSON, Polygon, Popup, useMap } from "react-leaflet";
 import { geoJSON as leafletGeoJSON } from "leaflet";
 import "@/lib/leafletIcons";
@@ -368,6 +369,7 @@ export default function SituationMap() {
   const [communityReports, setCommunityReports] = useState<CommunityReport[]>([]);
   const [reservoirs, setReservoirs] = useState<Reservoir[]>([]);
   const [showAllReservoirs, setShowAllReservoirs] = useState(false);
+  const [showIrrigationReservoirs, setShowIrrigationReservoirs] = useState(false);
   const [floodRisk, setFloodRisk] = useState<FloodRiskDistrict[]>([]);
   const [floodRiskModel, setFloodRiskModel] = useState<FloodRiskModelMeta | null>(null);
   const [floodRiskAvailable, setFloodRiskAvailable] = useState(true);
@@ -585,7 +587,7 @@ export default function SituationMap() {
       ) : (
         <>
           <div className="mb-4 rounded-b-xl border border-t-0 border-gray-200 bg-white p-4">
-          <div className="flex flex-wrap gap-4 text-xs text-gray-600">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-600">
             {viewMode === "requests" && (
               <>
                 {Object.entries(SEVERITY_COLOR).map(([severity, color]) => (
@@ -660,21 +662,6 @@ export default function SituationMap() {
               ))}
           </div>
 
-          {viewMode === "gauges" && (
-            <p className="mb-4 text-xs text-gray-400">
-              Live data from the Department of Irrigation's own public gauge network — the same feed behind
-              their official "Realtime Water Level in Major River" dashboard.
-            </p>
-          )}
-
-          {viewMode === "reservoirs" && (
-            <p className="mb-4 text-xs text-gray-400">
-              Kotmale, Victoria, and Randenigala (CEB/Mahaweli hydropower reservoirs) have real coordinates,
-              shown in their risk color. The 109 Irrigation Department reservoirs have no location data in
-              their source bulletin at all, so they're shown in light pink at their district's centroid —
-              click a pin for its actual risk level and details; see the full list below the map too.
-            </p>
-          )}
           {viewMode === "reservoirs" &&
             reservoirs.filter((r) => r.lat != null && r.lng != null).length === 0 && (
               <p className="mb-4 text-sm text-gray-500">Reservoir location data is temporarily unavailable.</p>
@@ -682,16 +669,8 @@ export default function SituationMap() {
 
 
           {viewMode === "floodRisk" && floodRiskModel && (
-            <div className="mb-4">
-              <p className="text-xs text-gray-400">
-                A trained model (logistic regression), not a guess: learned from {floodRiskModel.trainingWindow.startYear}-
-                {floodRiskModel.trainingWindow.endYear} historical flood reports (UNDRR DesInventar Sri Lanka) and daily
-                rainfall data (NASA POWER) for Sri Lanka. Its riskiest-ranked district-months are about{" "}
-                {(floodRiskModel.topDecilePrecision / floodRiskModel.baseRate).toFixed(1)}x more likely to have had a
-                real flood than a random one — real signal, but this is a dissertation-scope model, not a certified
-                forecasting system. Treat it as one input among many, not a guarantee.
-              </p>
-              <div className="mt-2 flex items-center gap-3">
+            <div className="mb-4 mt-2">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={retrainFloodModel}
                   disabled={retrainingModel}
@@ -712,63 +691,37 @@ export default function SituationMap() {
           )}
 
           {viewMode === "earthquakes" && (
-            <p className="mb-4 text-xs text-gray-400">
-              Magnitude 4.0+ earthquakes over the last 30 days
-              {earthquakeScope === "regional"
-                ? " across the Indian Ocean / Bay of Bengal / Sumatra subduction zone — the region that produced the 2004 Indian Ocean tsunami. This is a regional tsunami-risk indicator, not a Sri Lanka earthquake feed, which is why the map re-centers on the wider region for this scope."
-                : " within Sri Lanka and its immediate waters."}{" "}
-              Sri Lanka itself sits on stable crust and rarely has local seismic activity.
-            </p>
-          )}
-
-          {viewMode === "earthquakes" && (
-            <div className="mb-4 flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={earthquakeScope === "regional"}
-                  onChange={(e) => setEarthquakeScope(e.target.checked ? "regional" : "sri-lanka")}
-                />
-                Show all regional events
-                <span className="text-xs text-gray-400">
-                  (Sri Lanka rarely has one — switch this on to see real earthquake data across the wider region)
-                </span>
-              </label>
+            <div className="mb-4 mt-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setEarthquakeScope(earthquakeScope === "regional" ? "sri-lanka" : "regional")}
+                className="rounded-full border border-orange-200 bg-orange-50 px-4 py-1.5 text-xs font-medium text-orange-700 hover:border-orange-300 hover:bg-orange-100"
+              >
+                {earthquakeScope === "regional" ? "Show Sri Lanka only" : "Show regional earthquakes"}
+              </button>
               {earthquakeLoading && <span className="text-xs text-gray-400">Loading...</span>}
             </div>
           )}
 
           {viewMode === "earthquakes" && !earthquakeLoading && earthquakes.length === 0 && (
-            <p className="mb-4 text-sm text-gray-500">
-              {earthquakeScope === "regional"
-                ? "No magnitude 4.0+ earthquakes in the region in the last 30 days."
-                : "No magnitude 4.0+ earthquakes within Sri Lanka's immediate waters in the last 30 days — expected most days; try \"Show all regional events\" above."}
-            </p>
+            <p className="mb-4 text-sm text-gray-500">No active events</p>
           )}
 
           {viewMode === "gdacs" && (
-            <div className="mb-4 flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={gdacsScope === "global"}
-                  onChange={(e) => setGdacsScope(e.target.checked ? "global" : "sri-lanka")}
-                />
-                Show all global events
-                <span className="text-xs text-gray-400">
-                  (Sri Lanka rarely has an active one — switch this on to see real live GDACS data worldwide)
-                </span>
-              </label>
+            <div className="mb-4 mt-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setGdacsScope(gdacsScope === "global" ? "sri-lanka" : "global")}
+                className="rounded-full border border-orange-200 bg-orange-50 px-4 py-1.5 text-xs font-medium text-orange-700 hover:border-orange-300 hover:bg-orange-100"
+              >
+                {gdacsScope === "global" ? "Show Sri Lanka only" : "Show global alerts"}
+              </button>
               {gdacsLoading && <span className="text-xs text-gray-400">Loading...</span>}
             </div>
           )}
 
           {viewMode === "gdacs" && !gdacsLoading && gdacsEvents.length === 0 && (
-            <p className="mb-4 text-sm text-gray-500">
-              {gdacsScope === "global"
-                ? "No current GDACS events found."
-                : "No GDACS-tracked events relevant to Sri Lanka right now."}
-            </p>
+            <p className="mb-4 text-sm text-gray-500">No active events</p>
           )}
           </div>
 
@@ -1016,12 +969,8 @@ export default function SituationMap() {
             <p className="mt-4 text-sm text-gray-500">No active requests recorded yet.</p>
           )}
 
-          <div className="mt-6">
+          <div className="mt-6 rounded-xl border border-green-200 bg-green-50/60 p-4">
             <h2 className="text-sm font-semibold text-gray-900">Recent DMC Emergency Warnings</h2>
-            <p className="mt-1 text-xs text-gray-400">
-              DMC alerts are a suggestion, not automatic — pick the district the bulletin describes and mark
-              it active yourself rather than relying on parsing the district out of the text.
-            </p>
             {alerts.length === 0 ? (
               <p className="mt-2 text-sm text-gray-500">No active DMC warnings right now.</p>
             ) : (
@@ -1071,95 +1020,89 @@ export default function SituationMap() {
             )}
           </div>
 
-          <div className="mt-6">
-            <h2 className="text-sm font-semibold text-gray-900">Reservoir Storage Levels</h2>
-            <p className="mt-1 text-xs text-gray-400">
-              Describes current officially-reported state only — never a prediction of when a gate might open.
-              Two separate operators, two separate feeds, shown as distinct groups rather than one undifferentiated
-              list. Manage automatic vs. review-first notifications at{" "}
-              <a href="/admin/water-alerts" className="text-slate-700 hover:underline">
-                Water Level & Reservoir Area Alerts
-              </a>
-              .
-            </p>
+          {viewMode === "reservoirs" && (
+            <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+              <h2 className="text-sm font-semibold text-gray-900">Reservoir Storage Levels</h2>
 
-            {(() => {
-              const irrigation = reservoirs.filter((r) => r.source === "irrigation_department");
-              const flagged = irrigation.filter((r) => r.riskLevel !== "normal");
-              const visible = showAllReservoirs ? irrigation : flagged;
-              return (
-                <div className="mt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Irrigation Department Major & Medium Reservoirs
-                  </h3>
-                  <p className="mt-1 text-xs text-gray-400">
-                    Daily storage % and spilling status for {irrigation.length} irrigation reservoirs, from the
-                    Irrigation Department's own published bulletin.
-                  </p>
-                  <label className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                    <input
-                      type="checkbox"
-                      checked={showAllReservoirs}
-                      onChange={(e) => setShowAllReservoirs(e.target.checked)}
-                    />
-                    Show all {irrigation.length} reservoirs (default: only elevated/near-capacity/spilling)
-                  </label>
-                  {visible.length === 0 ? (
-                    <p className="mt-2 text-sm text-gray-500">
-                      {flagged.length === 0 ? "No reservoirs currently at elevated storage." : "No reservoirs to show."}
+              {(() => {
+                const irrigation = reservoirs.filter((r) => r.source === "irrigation_department");
+                const flagged = irrigation.filter((r) => r.riskLevel !== "normal");
+                const visible = showAllReservoirs ? irrigation : flagged;
+                return (
+                  <div className="mt-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Irrigation Department Major & Medium Reservoirs
+                    </h3>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Daily storage % and spilling status for {irrigation.length} irrigation reservoirs, from the
+                      Irrigation Department's own published bulletin.
                     </p>
-                  ) : (
-                    <ul className="mt-2 space-y-2">
-                      {visible.map((r) => (
-                        <ReservoirListItem key={r.name} r={r} />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })()}
+                    <button
+                      onClick={() => setShowIrrigationReservoirs((v) => !v)}
+                      className="mt-2 flex items-center gap-1 text-xs font-medium text-orange-700 hover:underline"
+                    >
+                      {showIrrigationReservoirs ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      {showIrrigationReservoirs ? "Hide reservoirs" : "View reservoirs"}
+                    </button>
+                    {showIrrigationReservoirs && (
+                      <>
+                        <button
+                          onClick={() => setShowAllReservoirs((v) => !v)}
+                          className="mt-2 flex items-center gap-1 text-xs font-medium text-orange-700 hover:underline"
+                        >
+                          {showAllReservoirs ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          {showAllReservoirs
+                            ? "Show less (elevated/near-capacity/spilling only)"
+                            : `Show all ${irrigation.length} reservoirs`}
+                        </button>
+                        {visible.length === 0 ? (
+                          <p className="mt-2 text-sm text-gray-500">
+                            {flagged.length === 0 ? "No reservoirs currently at elevated storage." : "No reservoirs to show."}
+                          </p>
+                        ) : (
+                          <ul className="mt-2 space-y-2">
+                            {visible.map((r) => (
+                              <ReservoirListItem key={r.name} r={r} />
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
 
-            {(() => {
-              const hydro = reservoirs.filter((r) => r.source === "ceb_mahaweli");
-              return (
-                <div className="mt-6">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Hydropower & Mahaweli Reservoirs
-                  </h3>
-                  <p className="mt-1 text-xs text-gray-400">
-                    Level (MSL) and active storage % from CEB's Mahaweli Complex daily 6:00 AM bulletin — a separate
-                    operator from the Irrigation Department above. Only Kotmale, Victoria, and Randenigala publish a
-                    water-level figure here; Rantambe, Upper Kotmale, and the Laxapana-complex reservoirs
-                    (Castlereigh, Maussakelle, Samanalawewa) aren't available from this source.
-                  </p>
-                  {hydro.length === 0 ? (
-                    <p className="mt-2 text-sm text-gray-500">Hydropower reservoir data is temporarily unavailable.</p>
-                  ) : (
-                    <ul className="mt-2 space-y-2">
-                      {hydro.map((r) => (
-                        <ReservoirListItem key={r.name} r={r} />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
+              {(() => {
+                const hydro = reservoirs.filter((r) => r.source === "ceb_mahaweli");
+                return (
+                  <div className="mt-6">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Hydropower & Mahaweli Reservoirs
+                    </h3>
+                    {hydro.length === 0 ? (
+                      <p className="mt-2 text-sm text-gray-500">Hydropower reservoir data is temporarily unavailable.</p>
+                    ) : (
+                      <ul className="mt-2 space-y-2">
+                        {hydro.map((r) => (
+                          <ReservoirListItem key={r.name} r={r} />
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {viewMode === "gdacs" && (
-            <div className="mt-6">
+            <div
+              className={`mt-6 rounded-xl border p-4 ${
+                gdacsEvents.length === 0 ? "border-green-200 bg-green-50/60" : "border-red-200 bg-red-50/60"
+              }`}
+            >
               <h2 className="text-sm font-semibold text-gray-900">Global Disaster Alerts (GDACS)</h2>
-              <p className="mt-1 text-xs text-gray-400">
-                Tropical cyclone tracking and general disaster events from the Global Disaster Alert and
-                Coordination System (EC Joint Research Centre)
-                {gdacsScope === "global" ? " — showing all current events worldwide." : ", filtered to ones relevant to Sri Lanka."}
-              </p>
               {gdacsEvents.length === 0 ? (
-                <p className="mt-2 text-sm text-gray-500">
-                  {gdacsScope === "global"
-                    ? "No current GDACS events found."
-                    : "No GDACS-tracked events relevant to Sri Lanka right now."}
-                </p>
+                <p className="mt-2 text-sm text-gray-500">No active events</p>
               ) : (
                 <>
                   {gdacsScope === "global" && gdacsEvents.length > 20 && (
@@ -1202,22 +1145,14 @@ export default function SituationMap() {
           )}
 
           {viewMode === "earthquakes" && (
-            <div className="mt-6">
+            <div
+              className={`mt-6 rounded-xl border p-4 ${
+                earthquakes.length === 0 ? "border-green-200 bg-green-50/60" : "border-red-200 bg-red-50/60"
+              }`}
+            >
               <h2 className="text-sm font-semibold text-gray-900">Regional Seismic Activity — Tsunami Risk Indicator</h2>
-              <p className="mt-1 text-xs text-gray-400">
-                Recent magnitude 4.0+ earthquakes from USGS
-                {earthquakeScope === "regional"
-                  ? " across the Indian Ocean / Bay of Bengal / Sumatra subduction zone — the region that produced the 2004 Indian Ocean tsunami — showing all current regional events."
-                  : " within Sri Lanka and its immediate waters."}{" "}
-                Sri Lanka itself sits on stable crust and rarely has local seismic activity; this is a tsunami-risk
-                indicator, not a guaranteed-populated Sri Lanka earthquake feed.
-              </p>
               {earthquakes.length === 0 ? (
-                <p className="mt-2 text-sm text-gray-500">
-                  {earthquakeScope === "regional"
-                    ? "No magnitude 4.0+ earthquakes in the region in the last 30 days."
-                    : "No magnitude 4.0+ earthquakes within Sri Lanka's immediate waters in the last 30 days — expected most days; switch to \"Show all regional events\" above the map to see real regional data."}
-                </p>
+                <p className="mt-2 text-sm text-gray-500">No active events</p>
               ) : (
                 <ul className="mt-2 space-y-2">
                   {earthquakes.map((eq) => (
@@ -1251,16 +1186,12 @@ export default function SituationMap() {
             </div>
           )}
 
-          <div className="mt-6">
+          <div
+            className={`mt-6 rounded-xl border p-4 ${
+              communityReports.length === 0 ? "border-green-200 bg-green-50/60" : "border-red-200 bg-red-50/60"
+            }`}
+          >
             <h2 className="text-sm font-semibold text-gray-900">Verified Community Reports</h2>
-            <p className="mt-1 text-xs text-gray-400">
-              Road closures and water conditions reported by volunteers in the field, verified by an admin. Manage
-              and verify new ones at{" "}
-              <a href="/admin/community-reports" className="text-slate-700 hover:underline">
-                Community Reports
-              </a>
-              .
-            </p>
             {communityReports.length === 0 ? (
               <p className="mt-2 text-sm text-gray-500">No verified community reports right now.</p>
             ) : (

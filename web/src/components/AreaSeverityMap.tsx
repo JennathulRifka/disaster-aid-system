@@ -8,7 +8,6 @@ import { CheckCircle2, AlertTriangle, AlertOctagon, HelpCircle } from "lucide-re
 import "@/lib/leafletIcons";
 import { apiFetch } from "@/lib/api";
 import { CountrySearchBox, type CountryFeature } from "@/components/CountrySearchBox";
-import { InfoDisclosure } from "@/components/InfoDisclosure";
 
 interface AreaStat {
   district: string;
@@ -546,35 +545,16 @@ export function AreaSeverityMap({
         )}
       </div>
 
-      {viewMode === "gauges" && (
-        <p className="mb-3 text-xs text-gray-400">{t("severityMap.unofficialData")}</p>
-      )}
-      {viewMode === "reservoirs" && (
-        <InfoDisclosure summary={t("severityMap.reservoirsSimpleCaption")} details={t("severityMap.reservoirsMapCaption")} />
-      )}
       {viewMode === "reservoirs" &&
         reservoirsLoaded &&
         reservoirs.filter((r) => r.lat != null && r.lng != null).length === 0 && (
           <p className="mb-3 text-sm text-gray-500">{t("severityMap.reservoirsMapUnavailable")}</p>
         )}
       {viewMode === "floodRisk" && floodRiskModel && (
-        <InfoDisclosure
-          summary={t("severityMap.floodRiskSimpleCaption")}
-          details={t("severityMap.floodRiskCaption", {
-            startYear: floodRiskModel.trainingWindow.startYear,
-            endYear: floodRiskModel.trainingWindow.endYear,
-            multiplier: (floodRiskModel.topDecilePrecision / floodRiskModel.baseRate).toFixed(1),
-          })}
-        />
+        <p className="mb-3 text-xs text-gray-400">{t("severityMap.floodRiskSimpleCaption")}</p>
       )}
       {viewMode === "floodRisk" && floodRiskLoaded && !floodRiskAvailable && (
         <p className="mb-3 text-sm text-gray-500">{t("severityMap.floodRiskUnavailable")}</p>
-      )}
-      {viewMode === "gdacs" && (
-        <InfoDisclosure summary={t("severityMap.gdacsSimpleCaption")} details={t("severityMap.gdacsCaption")} />
-      )}
-      {viewMode === "earthquakes" && (
-        <InfoDisclosure summary={t("severityMap.earthquakesSimpleCaption")} details={t("severityMap.earthquakesCaption")} />
       )}
       {viewMode === "gdacs" && gdacsLoaded && !gdacsFetching && gdacsEvents.length === 0 && (
         <div className="mb-3">
@@ -591,7 +571,7 @@ export function AreaSeverityMap({
           )}
         </div>
       )}
-      {viewMode === "gdacs" && gdacsEvents.length > 0 && gdacsScope === "global" && (
+      {viewMode === "gdacs" && gdacsScope === "global" && (
         <button
           onClick={() => setGdacsScope("sri-lanka")}
           className="mb-3 block text-xs text-slate-600 hover:underline"
@@ -616,7 +596,7 @@ export function AreaSeverityMap({
           )}
         </div>
       )}
-      {viewMode === "earthquakes" && earthquakes.length > 0 && earthquakeScope === "regional" && (
+      {viewMode === "earthquakes" && earthquakeScope === "regional" && (
         <button
           onClick={() => setEarthquakeScope("sri-lanka")}
           className="mb-1 block text-xs text-slate-600 hover:underline"

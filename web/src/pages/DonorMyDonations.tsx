@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -29,6 +30,8 @@ interface Delivery {
 
 export default function DonorMyDonations() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const partialFailure = Boolean((location.state as { partialFailure?: boolean } | null)?.partialFailure);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [deliveries, setDeliveries] = useState<Record<string, Delivery>>({});
   const [loading, setLoading] = useState(true);
@@ -72,6 +75,12 @@ export default function DonorMyDonations() {
   return (
     <DashboardLayout>
       <h1 className="text-2xl font-semibold text-gray-900">{t("donorMyDonations.title")}</h1>
+
+      {partialFailure && (
+        <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {t("donorDonationForm.errorPartial")}
+        </p>
+      )}
 
       {loading ? (
         <p className="mt-4 text-sm text-gray-500">{t("common.loading")}</p>

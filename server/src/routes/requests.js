@@ -6,45 +6,11 @@ const { getCategoryLimits } = require("../utils/categories");
 const { logAction } = require("../utils/auditLog");
 const { sendNotificationToUser } = require("../utils/notifications");
 const { sendSmsToUser } = require("../utils/sms");
+const { normalizeAddress, normalizeNic, validateItems } = require("../utils/requestValidation");
 
 const router = express.Router();
 
 const ACTIVE_STATUSES = ["pending", "verified", "in_progress"];
-
-function normalizeAddress(address) {
-  return String(address || "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function normalizeNic(nic) {
-  return String(nic || "").trim().toUpperCase();
-}
-
-function validateItems(items, categoryLimits) {
-  if (!Array.isArray(items) || items.length === 0) {
-    return "At least one requested item is required.";
-  }
-
-  const seenCategories = new Set();
-  for (const item of items) {
-    const limit = categoryLimits[item?.category];
-    if (!limit) {
-      return `"${item?.category}" is not a recognized category.`;
-    }
-    if (seenCategories.has(item.category)) {
-      return `"${item.category}" was requested more than once — combine it into a single line.`;
-    }
-    seenCategories.add(item.category);
-
-    const quantity = Number(item.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      return `Quantity for "${item.category}" must be a positive number.`;
-    }
-    if (limit.max !== null && quantity > limit.max) {
-      return `"${limit.label}" is capped at ${limit.max} ${limit.unit} per request.`;
-    }
-  }
-  return null;
-}
 
 /**
  * Fraud signal, not a gate: a household submitting a second active request

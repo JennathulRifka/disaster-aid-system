@@ -1,5 +1,5 @@
 const { db } = require("../config/firebase");
-const { distanceKm } = require("./geo");
+const { rankVolunteers } = require("./volunteerRanking");
 
 // Same "what counts as active" definition VolunteerWorkload.tsx already uses
 // on the frontend — mirrored here so the tie-break reflects real current load.
@@ -42,15 +42,9 @@ async function findBestVolunteer(pickupLocation) {
     activeCountByVolunteer[volunteerId] = (activeCountByVolunteer[volunteerId] || 0) + 1;
   });
 
-  const ranked = candidates
-    .map((v) => ({
-      volunteer: v,
-      distanceKm: distanceKm(pickupLocation, v.location),
-      activeCount: activeCountByVolunteer[v.uid] || 0,
-    }))
-    .sort((a, b) => a.distanceKm - b.distanceKm || a.activeCount - b.activeCount);
+  const ranked = rankVolunteers(candidates, pickupLocation, activeCountByVolunteer);
 
   return ranked[0].volunteer;
 }
 
-module.exports = { findBestVolunteer, ACTIVE_DELIVERY_STATUSES };
+module.exports = { findBestVolunteer, rankVolunteers, ACTIVE_DELIVERY_STATUSES };
