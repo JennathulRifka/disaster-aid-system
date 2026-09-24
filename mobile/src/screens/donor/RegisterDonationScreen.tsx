@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator 
 import * as Location from "expo-location";
 import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useTranslation } from "react-i18next";
 import type { DonorTabParamList } from "../../navigation/types";
 import { apiFetch } from "../../lib/api";
 
@@ -13,10 +14,16 @@ interface CategoryLimit {
 }
 
 export function RegisterDonationScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation<BottomTabNavigationProp<DonorTabParamList>>();
   const [categories, setCategories] = useState<Record<string, CategoryLimit>>({});
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [items, setItems] = useState<Record<string, string>>({});
+  // Free-text `items` above stays the display label ("50 kg rice") —
+  // unchanged. `itemAmounts` is the new real-number field the
+  // district-inventory feature needs (see "Donation leftover-quantity
+  // tracking" in CLAUDE.md).
+  const [itemAmounts, setItemAmounts] = useState<Record<string, string>>({});
   const [deliveryMethod, setDeliveryMethod] = useState<"self" | "volunteer">("volunteer");
   const [notes, setNotes] = useState("");
   const [locationStatus, setLocationStatus] = useState<"idle" | "capturing" | "captured" | "error">("idle");
@@ -42,10 +49,20 @@ export function RegisterDonationScreen() {
       }
       return next;
     });
+    setItemAmounts((prev) => {
+      const next = { ...prev };
+      if (category in next) delete next[category];
+      else next[category] = "";
+      return next;
+    });
   }
 
   function setItemQuantity(category: string, value: string) {
     setItems((prev) => ({ ...prev, [category]: value }));
+  }
+
+  function setItemAmount(category: string, value: string) {
+    setItemAmounts((prev) => ({ ...prev, [category]: value }));
   }
 
   async function captureLocation() {
@@ -67,16 +84,20 @@ export function RegisterDonationScreen() {
   async function handleSubmit() {
     setError("");
     if (!location) {
-      setError("Please capture a pickup location before submitting.");
+      setError(t("donorDonationForm.errorNoLocation"));
       return;
     }
     const selectedCategories = Object.keys(items);
     if (selectedCategories.length === 0) {
-      setError("Select at least one item you're donating.");
+      setError(t("donorDonationForm.selectAtLeastOne"));
       return;
     }
     if (selectedCategories.some((category) => !items[category].trim())) {
-      setError("Please enter a quantity for each item you selected.");
+      setError(t("donorDonationForm.errorNoQuantity"));
+      return;
+    }
+    if (selectedCategories.some((category) => !(Number(itemAmounts[category]) > 0))) {
+      setError(t("donorDonationForm.errorNoAmount"));
       return;
     }
     setSubmitting(true);
@@ -88,7 +109,14 @@ export function RegisterDonationScreen() {
         selectedCategories.map((category) =>
           apiFetch("/api/donations", {
             method: "POST",
-            body: JSON.stringify({ category, quantity: items[category].trim(), location, deliveryMethod, notes }),
+            body: JSON.stringify({
+              category,
+              quantity: items[category].trim(),
+              quantityValue: Number(itemAmounts[category]),
+              location,
+              deliveryMethod,
+              notes,
+            }),
           })
         )
       );
@@ -105,16 +133,20 @@ export function RegisterDonationScreen() {
         setItems((prev) =>
           Object.fromEntries(Object.entries(prev).filter(([category]) => failedCategories.has(category)))
         );
-        setError("Some items failed to register — check My Donations, then retry the remaining ones here.");
+        setItemAmounts((prev) =>
+          Object.fromEntries(Object.entries(prev).filter(([category]) => failedCategories.has(category)))
+        );
+        setError(t("donorDonationForm.errorPartial"));
       } else {
         setItems({});
+        setItemAmounts({});
         setNotes("");
         setLocation(null);
         setLocationStatus("idle");
         navigation.navigate("MyDonations");
       }
     } catch (err: any) {
-      setError(err.message || "Failed to register donation.");
+      setError(err.message || t("donorDonationForm.errorGeneric"));
     } finally {
       setSubmitting(false);
     }
@@ -122,18 +154,13 @@ export function RegisterDonationScreen() {
 
   return (
     <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16 }}>
-      <Text className="text-2xl font-semibold text-gray-900">Register a Donation</Text>
-      <Text className="mt-1 text-sm text-gray-600">
-        Tell us what you're able to give — we'll match it to a verified request nearby.
-      </Text>
+      <Text className="text-2xl font-semibold text-gray-900">{t("donorDonationForm.title")}</Text>
+      <Text className="mt-1 text-sm text-gray-600">{t("donorDonationForm.subtitle")}</Text>
 
       <View className="mt-6 rounded-xl bg-white p-5 shadow-sm" style={{ gap: 20 }}>
         <View>
-          <Text className="mb-1 text-sm font-medium text-gray-700">What are you donating?</Text>
-          <Text className="mb-2 text-xs text-gray-500">
-            Select everything you're giving in this drop-off — pick as many categories as you like and enter a
-            quantity for each.
-          </Text>
+          <Text className="mb-1 text-sm font-medium text-gray-700">{t("donorDonationForm.whatAreYouDonating")}</Text>
+          <Text className="mb-2 text-xs text-gray-500">{t("donorDonationForm.whatAreYouDonatingHint")}</Text>
           {categoriesLoading ? (
             <ActivityIndicator />
           ) : (
@@ -160,15 +187,27 @@ export function RegisterDonationScreen() {
                       >
                         {selected && <Text className="text-xs font-bold text-white">✓</Text>}
                       </View>
-                      <Text className="flex-1 text-sm text-gray-700">{c.label}</Text>
+                      <Text className="flex-1 text-sm text-gray-700">
+                        {t(`categories.${category}`, { defaultValue: c.label })}
+                      </Text>
                     </TouchableOpacity>
                     {selected && (
-                      <TextInput
-                        value={items[category]}
-                        onChangeText={(v) => setItemQuantity(category, v)}
-                        placeholder="50 kg rice"
-                        className="w-28 rounded border border-gray-300 px-2 py-1 text-sm"
-                      />
+                      <View className="flex-row" style={{ gap: 6 }}>
+                        <TextInput
+                          value={items[category]}
+                          onChangeText={(v) => setItemQuantity(category, v)}
+                          placeholder={t("donorDonationForm.quantityPlaceholder")}
+                          className="w-24 rounded border border-gray-300 px-2 py-1 text-sm"
+                        />
+                        <TextInput
+                          value={itemAmounts[category] ?? ""}
+                          onChangeText={(v) => setItemAmount(category, v)}
+                          placeholder={t("donorDonationForm.amountPlaceholder")}
+                          keyboardType="numeric"
+                          accessibilityLabel={t("donorDonationForm.amountPlaceholder")}
+                          className="w-16 rounded border border-gray-300 px-2 py-1 text-sm"
+                        />
+                      </View>
                     )}
                   </View>
                 );
@@ -178,7 +217,7 @@ export function RegisterDonationScreen() {
         </View>
 
         <View>
-          <Text className="mb-2 text-sm font-medium text-gray-700">How will this reach the recipient?</Text>
+          <Text className="mb-2 text-sm font-medium text-gray-700">{t("donorDonationForm.deliveryMethodLabel")}</Text>
           <View style={{ gap: 8 }}>
             <TouchableOpacity
               onPress={() => setDeliveryMethod("volunteer")}
@@ -189,9 +228,9 @@ export function RegisterDonationScreen() {
               <Text
                 className={`font-medium ${deliveryMethod === "volunteer" ? "text-orange-700" : "text-gray-700"}`}
               >
-                Find a volunteer
+                {t("donorDonationForm.findVolunteer")}
               </Text>
-              <Text className="text-xs text-gray-500">A volunteer picks up and delivers it.</Text>
+              <Text className="text-xs text-gray-500">{t("donorDonationForm.findVolunteerDesc")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setDeliveryMethod("self")}
@@ -200,33 +239,31 @@ export function RegisterDonationScreen() {
               }`}
             >
               <Text className={`font-medium ${deliveryMethod === "self" ? "text-orange-700" : "text-gray-700"}`}>
-                I'll deliver it myself
+                {t("donorDonationForm.selfDeliver")}
               </Text>
-              <Text className="text-xs text-gray-500">You mark it delivered once it's dropped off.</Text>
+              <Text className="text-xs text-gray-500">{t("donorDonationForm.selfDeliverDesc")}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View>
-          <Text className="mb-1 text-sm font-medium text-gray-700">Pickup location</Text>
+          <Text className="mb-1 text-sm font-medium text-gray-700">{t("donorDonationForm.pickupLocation")}</Text>
           <TouchableOpacity onPress={captureLocation} className="items-start rounded border border-gray-300 px-3 py-2">
             <Text className="text-sm font-medium text-gray-700">
               {locationStatus === "capturing"
-                ? "Capturing..."
+                ? t("donorDonationForm.capturingLocation")
                 : locationStatus === "captured"
-                  ? "Location captured ✓"
-                  : "Capture my current location"}
+                  ? t("donorDonationForm.locationCaptured")
+                  : t("donorDonationForm.captureLocation")}
             </Text>
           </TouchableOpacity>
           {locationStatus === "error" && (
-            <Text className="mt-1 text-xs text-red-600">
-              Couldn't get your location — check location permissions and try again.
-            </Text>
+            <Text className="mt-1 text-xs text-red-600">{t("donorDonationForm.locationError")}</Text>
           )}
         </View>
 
         <View>
-          <Text className="mb-1 text-sm font-medium text-gray-700">Notes (optional)</Text>
+          <Text className="mb-1 text-sm font-medium text-gray-700">{t("donorDonationForm.notes")}</Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
@@ -248,7 +285,7 @@ export function RegisterDonationScreen() {
           {submitting ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text className="font-medium text-white">Register Donation</Text>
+            <Text className="font-medium text-white">{t("donorDonationForm.registerButton")}</Text>
           )}
         </TouchableOpacity>
       </View>

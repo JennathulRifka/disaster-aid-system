@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { HelpCircle } from "lucide-react";
 import { getFontScale, setFontScale, getHighContrast, setHighContrast, type FontScale } from "@/lib/accessibility";
@@ -31,25 +31,41 @@ export function AccessibilityControls({ onShowHelp }: { onShowHelp?: () => void 
     setContrastState(next);
   }
 
+  useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
   return (
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={t("common.accessibilityOptions")}
+        aria-haspopup="true"
+        aria-expanded={open}
         className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
       >
         Aa
       </button>
       {open && (
-        <div className="absolute right-0 z-[1200] mt-2 w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+        <div
+          role="region"
+          aria-label={t("common.accessibilityOptions")}
+          className="absolute right-0 z-[1200] mt-2 w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+        >
           <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
             {t("common.textSize")}
           </p>
-          <div className="flex gap-2">
+          <div className="flex gap-2" role="group" aria-label={t("common.textSize")}>
             {(Object.keys(SCALE_LABEL) as FontScale[]).map((s) => (
               <button
                 key={s}
                 onClick={() => applyScale(s)}
+                aria-pressed={scale === s}
                 className={`flex-1 rounded border px-2 py-1 text-xs font-medium ${
                   scale === s
                     ? "border-orange-600 bg-orange-50 text-orange-700"

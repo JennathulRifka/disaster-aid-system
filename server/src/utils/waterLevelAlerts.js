@@ -231,4 +231,11 @@ async function checkReservoirsAndAlert() {
   }
 }
 
-module.exports = { checkWaterLevelsAndAlert, checkReservoirsAndAlert, sendAreaAlert, STATUS_SEVERITY, RESERVOIR_RISK_SEVERITY };
+module.exports = {
+  checkWaterLevelsAndAlert,
+  checkReservoirsAndAlert,
+  sendAreaAlert,
+  findVictimsInDistrict,
+  STATUS_SEVERITY,
+  RESERVOIR_RISK_SEVERITY,
+};

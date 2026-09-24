@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { QrScanModal } from "@/components/QrScanModal";
 import { ChatModal } from "@/components/ChatModal";
 import { apiFetch } from "@/lib/api";
+import { deliveryChatId } from "@/lib/deliveryChat";
 
 // Chats open once the delivery is actually linked (immediately for
 // self-delivery, once a volunteer accepts for volunteer-delivery) and stay
@@ -34,6 +35,7 @@ interface Delivery {
   donationId: string;
   status: string;
   method: "self" | "volunteer";
+  handoffVersion?: number;
 }
 
 export default function VictimMyRequests() {
@@ -149,7 +151,13 @@ export default function VictimMyRequests() {
                           {delivery && CHATTABLE_STATUSES.has(delivery.status) && (
                             <button
                               onClick={() =>
-                                setActiveChatId(`${delivery.id}_${delivery.method === "self" ? "donor_victim" : "volunteer_victim"}`)
+                                setActiveChatId(
+                                  deliveryChatId(
+                                    delivery.id,
+                                    delivery.method === "self" ? "donor_victim" : "volunteer_victim",
+                                    delivery.handoffVersion
+                                  )
+                                )
                               }
                               className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                             >

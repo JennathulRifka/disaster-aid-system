@@ -55,12 +55,14 @@ export function DistrictSearchBox({
           }}
           onFocus={() => setOpen(true)}
           placeholder="Search for a district..."
+          aria-label="Search for a district"
           className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm"
         />
         {selectedName && (
           <button
             onClick={handleClear}
             title="Clear"
+            aria-label="Clear district search"
             className="rounded border border-gray-300 px-2 text-xs text-gray-600 hover:bg-gray-50"
           >
             ✕

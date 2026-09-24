@@ -123,4 +123,49 @@ router.get("/by-area", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/stats/district-need
+ * Public endpoint (no auth) — same privacy posture as /by-area above:
+ * aggregate counts only, never an individual request. Built for the donor
+ * "what's still needed, by district" dashboard, since a donor's own client
+ * can't read other victims' aidRequests documents directly (Firestore rules
+ * correctly restrict that to the request's own victim or an admin) — this
+ * computes the aggregate server-side, via the Admin SDK, which bypasses
+ * rules the same way every other stats endpoint here already does.
+ *
+ * Unlike /by-area (severity only), this breaks the pending-item count down
+ * by category too, since "5 water bottles still needed in Kandy" is what
+ * the district-inventory feature actually needs — see "Donation
+ * leftover-quantity tracking & district inventory" in CLAUDE.md.
+ */
+router.get("/district-need", async (req, res) => {
+  try {
+    const rows = await getCached("stats-district-need", STATS_CACHE_TTL_MS, async () => {
+      const snapshot = await db.collection("aidRequests").where("status", "in", ACTIVE_STATUSES).get();
+
+      const byKey = {};
+      snapshot.docs.forEach((doc) => {
+        const request = doc.data();
+        if (!request.location) return;
+        const district = nearestDistrict(request.location);
+        (request.items || [])
+          .filter((item) => item.status === "pending")
+          .forEach((item) => {
+            const key = `${district}::${item.category}`;
+            if (!byKey[key]) byKey[key] = { district, category: item.category, pendingCount: 0, pendingQuantity: 0 };
+            byKey[key].pendingCount += 1;
+            byKey[key].pendingQuantity += Number(item.quantity) || 0;
+          });
+      });
+
+      return Object.values(byKey).sort((a, b) => b.pendingQuantity - a.pendingQuantity);
+    });
+
+    return res.json(rows);
+  } catch (err) {
+    console.error("Stats district-need error:", err.message);
+    return res.status(500).json({ error: "Failed to load district need.", details: err.message });
+  }
+});
+
 module.exports = router;

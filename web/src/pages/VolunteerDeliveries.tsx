@@ -1,11 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DeliveryQrCode } from "@/components/DeliveryQrCode";
 import { ChatModal } from "@/components/ChatModal";
 import { apiFetch } from "@/lib/api";
+import { deliveryChatId } from "@/lib/deliveryChat";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 
 const NAVIGABLE_STATUSES = new Set(["accepted", "picked_up"]);
 // Chats open once a volunteer accepts (see server/src/utils/deliveryChats.js)
@@ -17,10 +21,36 @@ interface Delivery {
   id: string;
   requestId: string;
   donationId: string;
+  category: string;
   status: string;
   createdAt: string;
   confirmToken?: string;
+  handoffVersion?: number;
 }
+
+interface HandoffRequest {
+  id: string;
+  deliveryId: string;
+  fromVolunteerId: string;
+  toVolunteerId: string;
+  category: string;
+  destinationDistrict: string | null;
+  status: "pending" | "accepted" | "declined" | "cancelled";
+  createdAt: string;
+}
+
+interface FellowTraveller {
+  deliveryId: string;
+  category: string;
+  originDistrict: string | null;
+  destinationDistrict: string | null;
+  status: string;
+}
+
+// A delivery is worth showing fellow-traveller matches for once the
+// volunteer has actually committed to it (matches the backend's own
+// ACTIVE_DELIVERY_STATUSES in routes/deliveries.js).
+const FELLOW_TRAVELLER_STATUSES = new Set(["accepted", "picked_up"]);
 
 const NEXT_STATUS: Record<string, string> = {
   accepted: "picked_up",
@@ -29,7 +59,10 @@ const NEXT_STATUS: Record<string, string> = {
 
 export default function VolunteerDeliveries() {
   const { t } = useTranslation();
+  const { profile } = useAuth();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [handoffs, setHandoffs] = useState<HandoffRequest[]>([]);
+  const [handoffActionOn, setHandoffActionOn] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -37,6 +70,10 @@ export default function VolunteerDeliveries() {
   const [savingAvailability, setSavingAvailability] = useState(false);
   const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"idle" | "capturing" | "error">("idle");
+  const [fellowTravellers, setFellowTravellers] = useState<Record<string, FellowTraveller[]>>({});
+  const [fellowLoading, setFellowLoading] = useState<string | null>(null);
+  const [sameOriginOnly, setSameOriginOnly] = useState<Record<string, boolean>>({});
+  const [startingChatWith, setStartingChatWith] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -52,6 +89,55 @@ export default function VolunteerDeliveries() {
       setMyLocation(me.location || null);
     });
   }, []);
+
+  // Handoff requests (Fellow Travellers Phase 2) live, either direction —
+  // sent (I'm fromVolunteerId) or received (I'm toVolunteerId). Two queries
+  // merged in JS, same reason chats.js's GET /mine does the same thing:
+  // Firestore can't OR across two different fields in one query.
+  useEffect(() => {
+    if (!profile?.uid) return;
+    const sent: HandoffRequest[] = [];
+    const received: HandoffRequest[] = [];
+    let unsubSent: () => void = () => {};
+    let unsubReceived: () => void = () => {};
+
+    function merge() {
+      setHandoffs([...sent, ...received]);
+    }
+
+    unsubSent = onSnapshot(
+      query(collection(db, "deliveryHandoffs"), where("fromVolunteerId", "==", profile.uid)),
+      (snap) => {
+        sent.length = 0;
+        snap.docs.forEach((d) => sent.push({ id: d.id, ...d.data() } as HandoffRequest));
+        merge();
+      }
+    );
+    unsubReceived = onSnapshot(
+      query(collection(db, "deliveryHandoffs"), where("toVolunteerId", "==", profile.uid)),
+      (snap) => {
+        received.length = 0;
+        snap.docs.forEach((d) => received.push({ id: d.id, ...d.data() } as HandoffRequest));
+        merge();
+      }
+    );
+    return () => {
+      unsubSent();
+      unsubReceived();
+    };
+  }, [profile?.uid]);
+
+  const incomingHandoffs = useMemo(
+    () => handoffs.filter((h) => h.toVolunteerId === profile?.uid && h.status === "pending"),
+    [handoffs, profile?.uid]
+  );
+  const outgoingPendingByDelivery = useMemo(() => {
+    const map: Record<string, HandoffRequest> = {};
+    for (const h of handoffs) {
+      if (h.fromVolunteerId === profile?.uid && h.status === "pending") map[h.deliveryId] = h;
+    }
+    return map;
+  }, [handoffs, profile?.uid]);
 
   async function toggleAvailability() {
     if (available === null) return;
@@ -105,6 +191,61 @@ export default function VolunteerDeliveries() {
       await load();
     } finally {
       setActingOn(null);
+    }
+  }
+
+  async function loadFellowTravellers(deliveryId: string) {
+    setFellowLoading(deliveryId);
+    try {
+      const qs = sameOriginOnly[deliveryId] ? "?sameOrigin=true" : "";
+      const data = await apiFetch(`/api/deliveries/${deliveryId}/fellow-travellers${qs}`);
+      setFellowTravellers((prev) => ({ ...prev, [deliveryId]: data }));
+    } finally {
+      setFellowLoading(null);
+    }
+  }
+
+  async function messageFellowTraveller(deliveryId: string, otherDeliveryId: string) {
+    setStartingChatWith(otherDeliveryId);
+    try {
+      const { chatId } = await apiFetch(`/api/deliveries/${deliveryId}/fellow-travellers/${otherDeliveryId}/chat`, {
+        method: "POST",
+      });
+      setActiveChatId(chatId);
+    } finally {
+      setStartingChatWith(null);
+    }
+  }
+
+  async function requestHandoff(deliveryId: string, otherDeliveryId: string) {
+    if (!window.confirm(t("volunteerDeliveries.handoffConfirm"))) return;
+    setHandoffActionOn(otherDeliveryId);
+    try {
+      await apiFetch(`/api/deliveries/${deliveryId}/handoff`, {
+        method: "POST",
+        body: JSON.stringify({ otherDeliveryId }),
+      });
+    } finally {
+      setHandoffActionOn(null);
+    }
+  }
+
+  async function respondToHandoff(handoffId: string, decision: "accept" | "decline") {
+    setHandoffActionOn(handoffId);
+    try {
+      await apiFetch(`/api/deliveries/handoffs/${handoffId}/${decision}`, { method: "PATCH" });
+      if (decision === "accept") await load(); // the delivery now belongs to us — pull it into the list
+    } finally {
+      setHandoffActionOn(null);
+    }
+  }
+
+  async function cancelHandoff(handoffId: string) {
+    setHandoffActionOn(handoffId);
+    try {
+      await apiFetch(`/api/deliveries/handoffs/${handoffId}/cancel`, { method: "PATCH" });
+    } finally {
+      setHandoffActionOn(null);
     }
   }
 
@@ -181,6 +322,37 @@ export default function VolunteerDeliveries() {
         <p className="mt-1 text-right text-xs text-amber-700">{t("volunteerDeliveries.setLocationHint")}</p>
       )}
 
+      {incomingHandoffs.length > 0 && (
+        <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4">
+          <p className="text-sm font-medium text-orange-900">{t("volunteerDeliveries.handoffIncomingTitle")}</p>
+          <ul className="mt-2 space-y-2">
+            {incomingHandoffs.map((h) => (
+              <li key={h.id} className="flex items-center justify-between rounded border border-orange-200 bg-white px-3 py-2 text-sm">
+                <span className="text-gray-700">
+                  {t(`categories.${h.category}`, h.category)} — {h.destinationDistrict || "?"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={handoffActionOn === h.id}
+                    onClick={() => respondToHandoff(h.id, "accept")}
+                    className="rounded bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {t("volunteerDeliveries.handoffAccept")}
+                  </button>
+                  <button
+                    disabled={handoffActionOn === h.id}
+                    onClick={() => respondToHandoff(h.id, "decline")}
+                    className="rounded bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    {t("volunteerDeliveries.handoffDecline")}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {loading ? (
         <p className="mt-4 text-sm text-gray-500">{t("common.loading")}</p>
       ) : deliveries.length === 0 ? (
@@ -191,7 +363,8 @@ export default function VolunteerDeliveries() {
             <div key={d.id} className="rounded-xl border border-gray-200 bg-white p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium capitalize text-gray-900">
+                    {t(`categories.${d.category}`, d.category)} —{" "}
                     {t("volunteerDeliveries.deliveryNumber", { id: d.id.slice(0, 6) })}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -206,13 +379,13 @@ export default function VolunteerDeliveries() {
                   {CHATTABLE_STATUSES.has(d.status) && (
                     <>
                       <button
-                        onClick={() => setActiveChatId(`${d.id}_donor_volunteer`)}
+                        onClick={() => setActiveChatId(deliveryChatId(d.id, "donor_volunteer", d.handoffVersion))}
                         className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                       >
                         💬 {t("volunteerDeliveries.chatDonor")}
                       </button>
                       <button
-                        onClick={() => setActiveChatId(`${d.id}_volunteer_victim`)}
+                        onClick={() => setActiveChatId(deliveryChatId(d.id, "volunteer_victim", d.handoffVersion))}
                         className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                       >
                         💬 {t("volunteerDeliveries.chatVictim")}
@@ -261,7 +434,88 @@ export default function VolunteerDeliveries() {
 
               {d.status === "delivered" && d.confirmToken && (
                 <div className="mt-4 flex justify-center">
-                  <DeliveryQrCode deliveryId={d.id} token={d.confirmToken} />
+                  <DeliveryQrCode
+                    deliveryId={d.id}
+                    token={d.confirmToken}
+                    details={t(`categories.${d.category}`, d.category)}
+                  />
+                </div>
+              )}
+
+              {FELLOW_TRAVELLER_STATUSES.has(d.status) && (
+                <div className="mt-4 border-t border-gray-100 pt-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-gray-600">
+                      {t("volunteerDeliveries.fellowTravellersTitle")}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <input
+                          type="checkbox"
+                          checked={!!sameOriginOnly[d.id]}
+                          onChange={(e) => setSameOriginOnly((prev) => ({ ...prev, [d.id]: e.target.checked }))}
+                        />
+                        {t("volunteerDeliveries.fellowTravellersSameOrigin")}
+                      </label>
+                      <button
+                        onClick={() => loadFellowTravellers(d.id)}
+                        disabled={fellowLoading === d.id}
+                        className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {fellowLoading === d.id
+                          ? t("common.loading")
+                          : t("volunteerDeliveries.fellowTravellersFind")}
+                      </button>
+                    </div>
+                  </div>
+
+                  {outgoingPendingByDelivery[d.id] ? (
+                    <div className="mt-2 flex items-center justify-between rounded border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+                      <span>{t("volunteerDeliveries.handoffPending")}</span>
+                      <button
+                        disabled={handoffActionOn === outgoingPendingByDelivery[d.id].id}
+                        onClick={() => cancelHandoff(outgoingPendingByDelivery[d.id].id)}
+                        className="rounded border border-amber-300 bg-white px-2 py-1 font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        {t("volunteerDeliveries.handoffCancel")}
+                      </button>
+                    </div>
+                  ) : (
+                    fellowTravellers[d.id] &&
+                    (fellowTravellers[d.id].length === 0 ? (
+                      <p className="mt-2 text-xs text-gray-500">{t("volunteerDeliveries.fellowTravellersNone")}</p>
+                    ) : (
+                      <ul className="mt-2 space-y-1.5">
+                        {fellowTravellers[d.id].map((ft) => (
+                          <li
+                            key={ft.deliveryId}
+                            className="flex items-center justify-between rounded border border-gray-100 bg-gray-50 px-2.5 py-1.5 text-xs"
+                          >
+                            <span className="text-gray-700">
+                              {t(`categories.${ft.category}`, ft.category)} · {ft.originDistrict || "?"} →{" "}
+                              {ft.destinationDistrict || "?"}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                disabled={startingChatWith === ft.deliveryId}
+                                onClick={() => messageFellowTraveller(d.id, ft.deliveryId)}
+                                className="rounded border border-gray-300 bg-white px-2 py-1 font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                              >
+                                💬 {t("volunteerDeliveries.fellowTravellersMessage")}
+                              </button>
+                              <button
+                                disabled={handoffActionOn === ft.deliveryId}
+                                onClick={() => requestHandoff(d.id, ft.deliveryId)}
+                                className="rounded border border-orange-300 bg-orange-50 px-2 py-1 font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+                              >
+                                {t("volunteerDeliveries.handoffButton")}
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ))
+                  )}
                 </div>
               )}
             </div>

@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../navigation/types";
 import { loginUser } from "../../lib/auth";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
+import { PasswordInput } from "../../components/PasswordInput";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
@@ -54,16 +55,17 @@ export function LoginScreen({ navigation }: Props) {
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
+            accessibilityLabel={t("auth.email")}
             className="rounded border border-gray-300 px-3 py-2.5"
           />
         </View>
 
         <View className="mb-4">
           <Text className="mb-1 text-sm font-medium text-gray-700">{t("auth.password")}</Text>
-          <TextInput
-            secureTextEntry
+          <PasswordInput
             value={password}
             onChangeText={setPassword}
+            accessibilityLabel={t("auth.password")}
             className="rounded border border-gray-300 px-3 py-2.5"
           />
         </View>
@@ -73,6 +75,8 @@ export function LoginScreen({ navigation }: Props) {
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={loading}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loading }}
           className="items-center rounded bg-orange-600 py-3"
           style={{ opacity: loading ? 0.5 : 1 }}
         >

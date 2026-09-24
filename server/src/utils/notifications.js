@@ -2,12 +2,33 @@ const { admin, db } = require("../config/firebase");
 
 /**
  * Sends a push notification to every device a user has registered an FCM
- * token for (see POST /api/users/fcm-token). Fails soft — a missing profile,
- * no registered tokens, or a send error should never break the caller's
- * actual work (verifying a request, updating a delivery, etc.), so this
- * never throws.
+ * token for (see POST /api/users/fcm-token), AND records it in the
+ * `notifications` collection so it shows up in the in-app Notifications list
+ * regardless of whether push actually reached a device (no permission
+ * granted, no token registered, a transient FCM failure, etc.) — the
+ * persisted record is the source of truth the Notifications screen reads
+ * from, push is just the best-effort real-time nudge on top of it. Every
+ * existing call site (request-approved, delivery status, SOS, delivery chat,
+ * area alerts) gets an in-app history entry for free from this one change,
+ * no per-call-site updates needed. Fails soft everywhere — a missing
+ * profile, no registered tokens, or a send/write error should never break
+ * the caller's actual work (verifying a request, updating a delivery,
+ * etc.), so this never throws.
  */
 async function sendNotificationToUser(uid, { title, body, data = {} }) {
+  try {
+    await db.collection("notifications").add({
+      uid,
+      title,
+      body,
+      data,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(`Notification history write failed for user ${uid}:`, err.message);
+  }
+
   try {
     const userDoc = await db.collection("users").doc(uid).get();
     const tokens = userDoc.data()?.fcmTokens || [];

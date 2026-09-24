@@ -20,6 +20,7 @@ const ACTION_LABELS: Record<string, string> = {
   "donation.match": "Matched donation",
   "delivery.assign": "Assigned volunteer",
   "delivery.reassign": "Reassigned volunteer",
+  "delivery.handoff": "Volunteer handoff",
   "district.activate": "Activated district",
   "district.deactivate": "Deactivated district",
   "area_alert.approve": "Approved area alert",
@@ -38,6 +39,7 @@ const ACTION_BADGE: Record<string, string> = {
   "donation.match": "bg-purple-100 text-purple-800",
   "delivery.assign": "bg-blue-100 text-blue-800",
   "delivery.reassign": "bg-blue-100 text-blue-800",
+  "delivery.handoff": "bg-blue-100 text-blue-800",
   "district.activate": "bg-red-100 text-red-800",
   "district.deactivate": "bg-gray-100 text-gray-800",
   "area_alert.approve": "bg-blue-100 text-blue-800",
@@ -65,6 +67,8 @@ function describeEntry(entry: AuditEntry) {
     }
     case "delivery.reassign":
       return `Volunteer ${entry.details.volunteerId} → request ${entry.details.requestId} (was ${entry.details.previousVolunteerId})`;
+    case "delivery.handoff":
+      return `Delivery ${entry.targetId}: volunteer ${entry.details.previousVolunteerId} → ${entry.details.newVolunteerId} (fellow-traveller handoff)`;
     case "district.activate":
       return `${entry.details.district}${entry.details.sourceAlertTitle ? ` (from DMC alert: "${entry.details.sourceAlertTitle}")` : " (manual)"}`;
     case "district.deactivate":

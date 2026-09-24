@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { registerUser, type UserRole } from "@/lib/auth";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { PasswordInput } from "@/components/PasswordInput";
 import { normalizeSriLankanPhone } from "@/lib/phone";
 
 export default function Register() {
@@ -77,8 +78,7 @@ export default function Register() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">{t("auth.password")}</label>
-            <input
-              type="password"
+            <PasswordInput
               required
               minLength={6}
               value={password}

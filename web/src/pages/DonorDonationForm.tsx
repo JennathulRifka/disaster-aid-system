@@ -31,6 +31,12 @@ export default function DonorDonationForm() {
   const [categories, setCategories] = useState<Record<string, CategoryLimit>>({});
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [items, setItems] = useState<Record<string, string>>({});
+  // The free-text `items` quantity above stays the display label ("50 kg
+  // rice") — unchanged. `itemAmounts` is the new real-number field the
+  // district-inventory feature needs for actual remainder arithmetic (see
+  // "Donation leftover-quantity tracking" in CLAUDE.md for why free text
+  // alone can't support that).
+  const [itemAmounts, setItemAmounts] = useState<Record<string, string>>({});
   const [deliveryMethod, setDeliveryMethod] = useState<"self" | "volunteer">("volunteer");
   const [notes, setNotes] = useState("");
   const [locationStatus, setLocationStatus] = useState<"idle" | "capturing" | "captured" | "error">("idle");
@@ -57,10 +63,20 @@ export default function DonorDonationForm() {
       }
       return next;
     });
+    setItemAmounts((prev) => {
+      const next = { ...prev };
+      if (category in next) delete next[category];
+      else next[category] = "";
+      return next;
+    });
   }
 
   function setItemQuantity(category: string, value: string) {
     setItems((prev) => ({ ...prev, [category]: value }));
+  }
+
+  function setItemAmount(category: string, value: string) {
+    setItemAmounts((prev) => ({ ...prev, [category]: value }));
   }
 
   function captureLocation() {
@@ -94,6 +110,10 @@ export default function DonorDonationForm() {
       setError(t("donorDonationForm.errorNoQuantity"));
       return;
     }
+    if (selectedCategories.some((category) => !(Number(itemAmounts[category]) > 0))) {
+      setError(t("donorDonationForm.errorNoAmount"));
+      return;
+    }
     setSubmitting(true);
     try {
       // One donation per selected category — donations have always been
@@ -105,7 +125,14 @@ export default function DonorDonationForm() {
         selectedCategories.map((category) =>
           apiFetch("/api/donations", {
             method: "POST",
-            body: JSON.stringify({ category, quantity: items[category].trim(), location, deliveryMethod, notes }),
+            body: JSON.stringify({
+              category,
+              quantity: items[category].trim(),
+              quantityValue: Number(itemAmounts[category]),
+              location,
+              deliveryMethod,
+              notes,
+            }),
           })
         )
       );
@@ -152,12 +179,23 @@ export default function DonorDonationForm() {
                         {t(`categories.${category}`, c.label)}
                       </label>
                       {selected && (
-                        <input
-                          value={items[category]}
-                          onChange={(e) => setItemQuantity(category, e.target.value)}
-                          placeholder={t("donorDonationForm.quantityPlaceholder")}
-                          className="w-36 rounded border border-gray-300 px-2 py-1 text-sm"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            value={items[category]}
+                            onChange={(e) => setItemQuantity(category, e.target.value)}
+                            placeholder={t("donorDonationForm.quantityPlaceholder")}
+                            className="w-32 rounded border border-gray-300 px-2 py-1 text-sm"
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            value={itemAmounts[category] ?? ""}
+                            onChange={(e) => setItemAmount(category, e.target.value)}
+                            placeholder={t("donorDonationForm.amountPlaceholder")}
+                            aria-label={t("donorDonationForm.amountPlaceholder")}
+                            className="w-20 rounded border border-gray-300 px-2 py-1 text-sm"
+                          />
+                        </div>
                       )}
                     </div>
                   );
@@ -202,19 +240,25 @@ export default function DonorDonationForm() {
             <label className="mb-1 block text-sm font-medium text-gray-700">
               {t("donorDonationForm.pickupLocation")}
             </label>
-            <p className="mb-2 text-xs text-gray-500">{t("donorDonationForm.pickupLocationHint")}</p>
 
             <div className="mb-2 flex gap-2">
               <button
                 type="button"
-                onClick={() => setLocationMode("gps")}
+                onClick={() => {
+                  setLocationMode("gps");
+                  captureLocation();
+                }}
                 className={`rounded border px-3 py-1.5 text-xs font-medium ${
                   locationMode === "gps"
                     ? "border-orange-600 bg-orange-600 text-white"
                     : "border-gray-300 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                {t("donorDonationForm.captureLocation")}
+                {locationMode === "gps" && locationStatus === "capturing"
+                  ? t("donorDonationForm.capturingLocation")
+                  : locationMode === "gps" && locationStatus === "captured"
+                    ? t("donorDonationForm.locationCaptured")
+                    : t("donorDonationForm.captureLocation")}
               </button>
               <button
                 type="button"
@@ -230,20 +274,9 @@ export default function DonorDonationForm() {
             </div>
 
             {locationMode === "gps" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={captureLocation}
-                  className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  {locationStatus === "captured"
-                    ? t("donorDonationForm.locationCaptured")
-                    : t("donorDonationForm.captureLocation")}
-                </button>
-                {locationStatus === "error" && (
-                  <p className="mt-1 text-xs text-red-600">{t("donorDonationForm.locationError")}</p>
-                )}
-              </>
+              locationStatus === "error" && (
+                <p className="mt-1 text-xs text-red-600">{t("donorDonationForm.locationError")}</p>
+              )
             ) : (
               <>
                 <div className="overflow-hidden rounded border border-gray-300" style={{ height: "260px" }}>

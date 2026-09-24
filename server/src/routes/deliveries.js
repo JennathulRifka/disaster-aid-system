@@ -6,7 +6,15 @@ const { computeOverallStatus } = require("../utils/requestItemStatus");
 const { logAction } = require("../utils/auditLog");
 const { sendNotificationToUser } = require("../utils/notifications");
 const { sendSmsToUser } = require("../utils/sms");
-const { createChatsForAcceptedDelivery, lockChatsForDelivery } = require("../utils/deliveryChats");
+const { createChatsForAcceptedDelivery, lockChatsForDelivery, createOrGetFellowTravellerChat } = require("../utils/deliveryChats");
+const { nearestDistrict } = require("../utils/districts");
+
+// A delivery is "in transit and worth matching against" once the volunteer
+// has actually committed to it — excludes pending_acceptance (could still be
+// rejected) and anything past picked_up (already close to done). Used only
+// by the fellow-travellers feature below; every other status check in this
+// file is unchanged.
+const ACTIVE_DELIVERY_STATUSES = ["accepted", "picked_up"];
 
 const DELIVERY_NOTIFICATION_COPY = {
   picked_up: {
@@ -104,6 +112,11 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
         volunteerId,
         previousVolunteerId: existing.volunteerId,
       });
+      await sendNotificationToUser(volunteerId, {
+        title: "New delivery assignment",
+        body: `You've been assigned a ${donation.category} delivery — accept or reject it from My Deliveries.`,
+        data: { type: "delivery_assigned", deliveryId: donation.assignedDeliveryId },
+      });
 
       return res.json({ id: donation.assignedDeliveryId, ...existing, volunteerId, updatedAt: now });
     }
@@ -112,6 +125,12 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
       requestId,
       donationId,
       category: donation.category,
+      // Carries forward the quantity POST /:id/match already decided this
+      // match consumes — that decrement happened at match time and can't be
+      // recomputed later from remainingQuantity alone (it's already
+      // reflected there). Falls back to the donation's own remaining
+      // balance for pre-existing donations that predate this field.
+      allocatedQuantity: donation.pendingAllocatedQuantity ?? donation.remainingQuantity ?? null,
       volunteerId,
       method: "volunteer",
       status: "pending_acceptance", // pending_acceptance -> accepted | rejected -> picked_up -> delivered -> confirmed
@@ -124,6 +143,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
     await donationRef.update({
       assignedDeliveryId: docRef.id,
       deliveryStatus: "pending_acceptance",
+      pendingAllocatedQuantity: null,
       updatedAt: now,
     });
     await logAction(req.user, "delivery.assign", { type: "delivery", id: docRef.id }, {
@@ -131,6 +151,11 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
       donationId,
       volunteerId,
       source: "manual",
+    });
+    await sendNotificationToUser(volunteerId, {
+      title: "New delivery assignment",
+      body: `You've been assigned a ${donation.category} delivery — accept or reject it from My Deliveries.`,
+      data: { type: "delivery_assigned", deliveryId: docRef.id },
     });
 
     return res.status(201).json({ id: docRef.id, ...delivery });
@@ -378,8 +403,14 @@ router.get("/:id/navigation-info", requireAuth, requireRole("volunteer"), async 
 
 /**
  * GET /api/deliveries/by-donation/:donationId
- * Donor: look up the delivery tied to one of their own donations (used for
- * the self-delivery "Mark as delivered" button).
+ * Donor: look up every delivery tied to one of their own donations (used for
+ * the self-delivery "Mark as delivered" button and QR display). Returns an
+ * array, not a single delivery-or-null as before — a donation can now be
+ * matched more than once over its lifetime once it has leftover
+ * remainingQuantity (see "Donation leftover-quantity tracking" in
+ * CLAUDE.md), so it can have more than one delivery. The only two callers
+ * (DonorMyDonations.tsx web + mobile) were updated to render a list instead
+ * of assuming exactly one, in the same pass this changed.
  */
 router.get("/by-donation/:donationId", requireAuth, requireRole("donor"), async (req, res) => {
   try {
@@ -389,15 +420,11 @@ router.get("/by-donation/:donationId", requireAuth, requireRole("donor"), async 
       return res.status(403).json({ error: "This donation doesn't belong to you." });
     }
 
-    const snapshot = await db
-      .collection("deliveries")
-      .where("donationId", "==", req.params.donationId)
-      .limit(1)
-      .get();
-
-    if (snapshot.empty) return res.json(null);
-    const doc = snapshot.docs[0];
-    return res.json({ id: doc.id, ...doc.data() });
+    const snapshot = await db.collection("deliveries").where("donationId", "==", req.params.donationId).get();
+    const deliveries = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return res.json(deliveries);
   } catch (err) {
     console.error("Lookup delivery by donation error:", err.message);
     return res.status(500).json({ error: "Failed to look up delivery.", details: err.message });
@@ -449,6 +476,419 @@ router.post("/:id/confirm", requireAuth, requireRole("victim"), async (req, res)
   } catch (err) {
     console.error("Confirm delivery error:", err.message);
     return res.status(500).json({ error: "Failed to confirm delivery.", details: err.message });
+  }
+});
+
+/**
+ * GET /api/deliveries/:id/fellow-travellers
+ * Volunteer: other currently-active deliveries (accepted/picked_up),
+ * assigned to a DIFFERENT volunteer, heading to the same destination
+ * district as this one — see "Fellow travellers" in CLAUDE.md.
+ * ?sameOrigin=true additionally requires a matching origin district.
+ *
+ * Purely read-only — touches no delivery/donation/request state, and
+ * changes nothing about how deliveries are assigned, tracked, or
+ * confirmed. Runs via the Admin SDK (like every other cross-user
+ * aggregation in this app, e.g. GET /api/stats/district-need) because a
+ * volunteer's own client can only read deliveries where
+ * `volunteerId == self` per the Firestore rules — there's no way to do
+ * this matching from the client directly.
+ *
+ * Response is deliberately anonymized: no volunteer name, no donor/victim
+ * data, just district/category/status. Identity is only ever revealed
+ * through the existing consent-gated chat (POST .../chat below), same
+ * privacy posture as every other party pairing in this app.
+ */
+router.get("/:id/fellow-travellers", requireAuth, requireRole("volunteer"), async (req, res) => {
+  try {
+    const deliveryDoc = await db.collection("deliveries").doc(req.params.id).get();
+    if (!deliveryDoc.exists) return res.status(404).json({ error: "Delivery not found." });
+    const delivery = deliveryDoc.data();
+    if (delivery.volunteerId !== req.user.uid) {
+      return res.status(403).json({ error: "This delivery isn't assigned to you." });
+    }
+    if (!ACTIVE_DELIVERY_STATUSES.includes(delivery.status)) {
+      return res.json([]); // not currently in transit — nothing to match against
+    }
+
+    const [donationDoc, requestDoc] = await Promise.all([
+      db.collection("donations").doc(delivery.donationId).get(),
+      db.collection("aidRequests").doc(delivery.requestId).get(),
+    ]);
+    if (!donationDoc.exists || !requestDoc.exists) return res.json([]);
+    const myOrigin = donationDoc.data().district || nearestDistrict(donationDoc.data().location);
+    const myDestination = nearestDistrict(requestDoc.data().location);
+    if (!myDestination) return res.json([]);
+
+    const sameOriginOnly = req.query.sameOrigin === "true";
+
+    const snapshot = await db.collection("deliveries").where("status", "in", ACTIVE_DELIVERY_STATUSES).get();
+    const candidates = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((d) => d.id !== req.params.id && d.volunteerId && d.volunteerId !== req.user.uid);
+
+    const results = [];
+    for (const candidate of candidates) {
+      const [cDonationDoc, cRequestDoc] = await Promise.all([
+        db.collection("donations").doc(candidate.donationId).get(),
+        db.collection("aidRequests").doc(candidate.requestId).get(),
+      ]);
+      if (!cDonationDoc.exists || !cRequestDoc.exists) continue;
+      const cDestination = nearestDistrict(cRequestDoc.data().location);
+      if (!cDestination || cDestination !== myDestination) continue;
+      const cOrigin = cDonationDoc.data().district || nearestDistrict(cDonationDoc.data().location);
+      if (sameOriginOnly && cOrigin !== myOrigin) continue;
+
+      results.push({
+        deliveryId: candidate.id,
+        category: candidate.category,
+        originDistrict: cOrigin,
+        destinationDistrict: cDestination,
+        status: candidate.status,
+      });
+    }
+
+    return res.json(results);
+  } catch (err) {
+    console.error("Fellow travellers lookup error:", err.message);
+    return res.status(500).json({ error: "Failed to look up fellow travellers.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/deliveries/:id/fellow-travellers/:otherId/chat
+ * Volunteer: start (or re-open) a consent-gated chat with the volunteer on
+ * :otherId — a delivery surfaced by GET /:id/fellow-travellers above.
+ * Re-validates the match server-side rather than trusting whatever the
+ * client's last fetch showed (either delivery could have moved on —
+ * delivered, reassigned, etc. — in between).
+ */
+router.post("/:id/fellow-travellers/:otherId/chat", requireAuth, requireRole("volunteer"), async (req, res) => {
+  try {
+    const [deliveryDoc, otherDoc] = await Promise.all([
+      db.collection("deliveries").doc(req.params.id).get(),
+      db.collection("deliveries").doc(req.params.otherId).get(),
+    ]);
+    if (!deliveryDoc.exists || !otherDoc.exists) return res.status(404).json({ error: "Delivery not found." });
+    const delivery = deliveryDoc.data();
+    const other = otherDoc.data();
+
+    if (delivery.volunteerId !== req.user.uid) {
+      return res.status(403).json({ error: "This delivery isn't assigned to you." });
+    }
+    if (!other.volunteerId || other.volunteerId === req.user.uid) {
+      return res.status(400).json({ error: "That delivery isn't assigned to a different volunteer." });
+    }
+    if (!ACTIVE_DELIVERY_STATUSES.includes(delivery.status) || !ACTIVE_DELIVERY_STATUSES.includes(other.status)) {
+      return res.status(400).json({ error: "Both deliveries must be currently active (accepted or picked up)." });
+    }
+
+    const [requestDoc, otherRequestDoc] = await Promise.all([
+      db.collection("aidRequests").doc(delivery.requestId).get(),
+      db.collection("aidRequests").doc(other.requestId).get(),
+    ]);
+    if (!requestDoc.exists || !otherRequestDoc.exists) {
+      return res.status(404).json({ error: "The request behind one of these deliveries no longer exists." });
+    }
+    const myDestination = nearestDistrict(requestDoc.data().location);
+    const otherDestination = nearestDistrict(otherRequestDoc.data().location);
+    if (!myDestination || myDestination !== otherDestination) {
+      return res.status(400).json({ error: "These two deliveries aren't heading to the same district." });
+    }
+
+    const chatId = await createOrGetFellowTravellerChat(req.params.id, req.user.uid, req.params.otherId, other.volunteerId);
+    return res.json({ chatId });
+  } catch (err) {
+    console.error("Fellow traveller chat error:", err.message);
+    return res.status(500).json({ error: "Failed to start chat.", details: err.message });
+  }
+});
+
+/**
+ * Fellow travellers Phase 2 — handoff. See "Fellow travellers" in CLAUDE.md
+ * for the full design (this was explicitly deferred from Phase 1 pending
+ * its own review, since it touches actual delivery ownership rather than
+ * just read-only visibility + chat).
+ *
+ * A handoff is a two-step, confirmation-required transfer: Volunteer 1
+ * proposes it (POST /:id/handoff) to a volunteer currently surfaced by
+ * their own GET /:id/fellow-travellers list — re-validated server-side
+ * here, same as the chat-start route above, never trusted from the client.
+ * Volunteer 2 then accepts or declines; only accepting actually changes
+ * `deliveries.volunteerId`. Only ever eligible while the delivery is still
+ * `accepted`/`picked_up` (ACTIVE_DELIVERY_STATUSES) — once `delivered`, a
+ * confirmToken/QR already exists and a handoff no longer makes sense.
+ */
+
+/** The destination district a delivery is headed to, or null. Small and
+ * deliberately separate from the fellow-travellers routes above (rather
+ * than refactored to share one helper) so nothing already-verified there
+ * needed to be touched to add this. */
+async function getDeliveryDestinationDistrict(delivery) {
+  const requestDoc = await db.collection("aidRequests").doc(delivery.requestId).get();
+  if (!requestDoc.exists) return null;
+  return nearestDistrict(requestDoc.data().location);
+}
+
+/**
+ * POST /api/deliveries/:id/handoff
+ * Volunteer: propose handing off delivery :id to whichever volunteer owns
+ * `otherDeliveryId` — a delivery surfaced by GET /:id/fellow-travellers,
+ * same pattern as the fellow-traveller chat-start route (the client only
+ * ever knows another delivery's id, never a volunteer's uid directly — that
+ * anonymity is deliberate, see GET /:id/fellow-travellers above). The
+ * target volunteer is resolved server-side from that delivery. Only one
+ * pending handoff allowed per delivery at a time (prevents two different
+ * volunteers both trying to accept the same delivery at once).
+ */
+router.post("/:id/handoff", requireAuth, requireRole("volunteer"), async (req, res) => {
+  try {
+    const { otherDeliveryId } = req.body;
+    if (!otherDeliveryId) return res.status(400).json({ error: "otherDeliveryId is required." });
+    if (otherDeliveryId === req.params.id) {
+      return res.status(400).json({ error: "You can't hand off a delivery to itself." });
+    }
+
+    const [deliveryDoc, otherDoc] = await Promise.all([
+      db.collection("deliveries").doc(req.params.id).get(),
+      db.collection("deliveries").doc(otherDeliveryId).get(),
+    ]);
+    if (!deliveryDoc.exists || !otherDoc.exists) return res.status(404).json({ error: "Delivery not found." });
+    const delivery = deliveryDoc.data();
+    const other = otherDoc.data();
+
+    if (delivery.volunteerId !== req.user.uid) {
+      return res.status(403).json({ error: "This delivery isn't assigned to you." });
+    }
+    if (!ACTIVE_DELIVERY_STATUSES.includes(delivery.status)) {
+      return res.status(400).json({ error: "This delivery is no longer active — it can't be handed off." });
+    }
+    if (!other.volunteerId || other.volunteerId === req.user.uid) {
+      return res.status(400).json({ error: "That delivery isn't assigned to a different volunteer." });
+    }
+    if (!ACTIVE_DELIVERY_STATUSES.includes(other.status)) {
+      return res.status(400).json({ error: "That volunteer's own delivery is no longer active." });
+    }
+    const toVolunteerId = other.volunteerId;
+
+    // Re-validate the match server-side rather than trusting the client's
+    // last fellow-travellers fetch: the two deliveries must still share a
+    // destination district right now.
+    const [myDestination, theirDestination] = await Promise.all([
+      getDeliveryDestinationDistrict(delivery),
+      getDeliveryDestinationDistrict(other),
+    ]);
+    if (!myDestination || myDestination !== theirDestination) {
+      return res.status(400).json({ error: "These two deliveries aren't heading to the same district." });
+    }
+
+    const existingPending = await db
+      .collection("deliveryHandoffs")
+      .where("deliveryId", "==", req.params.id)
+      .where("status", "==", "pending")
+      .get();
+    if (!existingPending.empty) {
+      return res.status(409).json({ error: "This delivery already has a pending handoff request." });
+    }
+
+    const now = new Date().toISOString();
+    const handoff = {
+      deliveryId: req.params.id,
+      fromVolunteerId: req.user.uid,
+      toVolunteerId,
+      category: delivery.category,
+      destinationDistrict: myDestination,
+      status: "pending",
+      requestedAt: now,
+      respondedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const handoffRef = await db.collection("deliveryHandoffs").add(handoff);
+
+    await sendNotificationToUser(toVolunteerId, {
+      title: "Delivery handoff request",
+      body: `A fellow volunteer wants to hand off a ${delivery.category} delivery to you.`,
+      data: { type: "handoff.requested", handoffId: handoffRef.id, deliveryId: req.params.id },
+    });
+
+    return res.status(201).json({ id: handoffRef.id, ...handoff });
+  } catch (err) {
+    console.error("Create handoff error:", err.message);
+    return res.status(500).json({ error: "Failed to create handoff request.", details: err.message });
+  }
+});
+
+/**
+ * GET /api/deliveries/handoffs/mine
+ * Volunteer: every handoff they're involved in, either direction (sent or
+ * received) — two queries merged in JS, same pattern as chats.js's GET
+ * /mine (Firestore can't OR across two different fields in one query).
+ */
+router.get("/handoffs/mine", requireAuth, requireRole("volunteer"), async (req, res) => {
+  try {
+    const [sent, received] = await Promise.all([
+      db.collection("deliveryHandoffs").where("fromVolunteerId", "==", req.user.uid).get(),
+      db.collection("deliveryHandoffs").where("toVolunteerId", "==", req.user.uid).get(),
+    ]);
+    const handoffs = [...sent.docs, ...received.docs]
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return res.json(handoffs);
+  } catch (err) {
+    console.error("List my handoffs error:", err.message);
+    return res.status(500).json({ error: "Failed to list handoffs.", details: err.message });
+  }
+});
+
+/**
+ * PATCH /api/deliveries/handoffs/:id/accept
+ * The recipient volunteer accepts — this is the one place that actually
+ * changes deliveries.volunteerId post-acceptance. Re-validates the delivery
+ * is still owned by the requester and still active (it may have moved on —
+ * delivered, or a different handoff already accepted — since the request
+ * was made). Locks the OLD volunteer's two delivery chats as a preserved
+ * history record and opens a brand-new pair for the new volunteer (see
+ * chatIdFor()'s handoffVersion scheme in deliveryChats.js) rather than
+ * reusing/rebinding the old ones.
+ */
+router.patch("/handoffs/:id/accept", requireAuth, requireRole("volunteer"), async (req, res) => {
+  try {
+    const handoffRef = db.collection("deliveryHandoffs").doc(req.params.id);
+    const handoffDoc = await handoffRef.get();
+    if (!handoffDoc.exists) return res.status(404).json({ error: "Handoff request not found." });
+    const handoff = handoffDoc.data();
+
+    if (handoff.toVolunteerId !== req.user.uid) {
+      return res.status(403).json({ error: "This handoff request wasn't sent to you." });
+    }
+    if (handoff.status !== "pending") {
+      return res.status(400).json({ error: `This handoff request is already "${handoff.status}".` });
+    }
+
+    const deliveryRef = db.collection("deliveries").doc(handoff.deliveryId);
+    const deliveryDoc = await deliveryRef.get();
+    if (!deliveryDoc.exists) return res.status(404).json({ error: "The delivery behind this handoff no longer exists." });
+    const delivery = deliveryDoc.data();
+
+    if (delivery.volunteerId !== handoff.fromVolunteerId || !ACTIVE_DELIVERY_STATUSES.includes(delivery.status)) {
+      return res.status(409).json({
+        error: "This delivery is no longer available for handoff — it may have already moved on.",
+      });
+    }
+
+    const now = new Date().toISOString();
+    const newHandoffVersion = (delivery.handoffVersion || 0) + 1;
+    const updatedDelivery = { ...delivery, volunteerId: req.user.uid };
+
+    await deliveryRef.update({ volunteerId: req.user.uid, handoffVersion: newHandoffVersion, updatedAt: now });
+    await lockChatsForDelivery(handoff.deliveryId); // freezes the OLD volunteer's two chats as history
+    await createChatsForAcceptedDelivery(updatedDelivery, handoff.deliveryId, newHandoffVersion); // fresh pair for the new volunteer
+    await handoffRef.update({ status: "accepted", respondedAt: now, updatedAt: now });
+
+    await logAction(req.user, "delivery.handoff", { type: "delivery", id: handoff.deliveryId }, {
+      previousVolunteerId: handoff.fromVolunteerId,
+      newVolunteerId: req.user.uid,
+      requestId: delivery.requestId,
+      donationId: delivery.donationId,
+    });
+
+    const [donationDoc, requestDoc] = await Promise.all([
+      db.collection("donations").doc(delivery.donationId).get(),
+      db.collection("aidRequests").doc(delivery.requestId).get(),
+    ]);
+    await Promise.all([
+      sendNotificationToUser(handoff.fromVolunteerId, {
+        title: "Handoff accepted",
+        body: "The other volunteer accepted your delivery handoff request.",
+        data: { type: "handoff.accepted", deliveryId: handoff.deliveryId },
+      }),
+      donationDoc.exists &&
+        sendNotificationToUser(donationDoc.data().donorId, {
+          title: "Delivery volunteer changed",
+          body: "A different volunteer has taken over your delivery — everything else about it is unchanged.",
+          data: { type: "handoff.accepted", deliveryId: handoff.deliveryId },
+        }),
+      requestDoc.exists &&
+        sendNotificationToUser(requestDoc.data().victimId, {
+          title: "Delivery volunteer changed",
+          body: "A different volunteer has taken over your delivery — everything else about it is unchanged.",
+          data: { type: "handoff.accepted", deliveryId: handoff.deliveryId },
+        }),
+    ]);
+
+    return res.json({ id: handoff.deliveryId, status: delivery.status, volunteerId: req.user.uid });
+  } catch (err) {
+    console.error("Accept handoff error:", err.message);
+    return res.status(500).json({ error: "Failed to accept handoff.", details: err.message });
+  }
+});
+
+/**
+ * PATCH /api/deliveries/handoffs/:id/decline
+ * The recipient volunteer declines — a no-op on the delivery itself, so
+ * Volunteer 1 keeps their assignment and can propose a handoff to someone
+ * else.
+ */
+router.patch("/handoffs/:id/decline", requireAuth, requireRole("volunteer"), async (req, res) => {
+  try {
+    const handoffRef = db.collection("deliveryHandoffs").doc(req.params.id);
+    const handoffDoc = await handoffRef.get();
+    if (!handoffDoc.exists) return res.status(404).json({ error: "Handoff request not found." });
+    const handoff = handoffDoc.data();
+
+    if (handoff.toVolunteerId !== req.user.uid) {
+      return res.status(403).json({ error: "This handoff request wasn't sent to you." });
+    }
+    if (handoff.status !== "pending") {
+      return res.status(400).json({ error: `This handoff request is already "${handoff.status}".` });
+    }
+
+    const now = new Date().toISOString();
+    await handoffRef.update({ status: "declined", respondedAt: now, updatedAt: now });
+    await sendNotificationToUser(handoff.fromVolunteerId, {
+      title: "Handoff declined",
+      body: "The other volunteer declined your delivery handoff request.",
+      data: { type: "handoff.declined", deliveryId: handoff.deliveryId },
+    });
+
+    return res.json({ id: req.params.id, status: "declined" });
+  } catch (err) {
+    console.error("Decline handoff error:", err.message);
+    return res.status(500).json({ error: "Failed to decline handoff.", details: err.message });
+  }
+});
+
+/**
+ * PATCH /api/deliveries/handoffs/:id/cancel
+ * The sender withdraws their own still-pending request.
+ */
+router.patch("/handoffs/:id/cancel", requireAuth, requireRole("volunteer"), async (req, res) => {
+  try {
+    const handoffRef = db.collection("deliveryHandoffs").doc(req.params.id);
+    const handoffDoc = await handoffRef.get();
+    if (!handoffDoc.exists) return res.status(404).json({ error: "Handoff request not found." });
+    const handoff = handoffDoc.data();
+
+    if (handoff.fromVolunteerId !== req.user.uid) {
+      return res.status(403).json({ error: "This handoff request isn't yours to cancel." });
+    }
+    if (handoff.status !== "pending") {
+      return res.status(400).json({ error: `This handoff request is already "${handoff.status}".` });
+    }
+
+    const now = new Date().toISOString();
+    await handoffRef.update({ status: "cancelled", respondedAt: now, updatedAt: now });
+    await sendNotificationToUser(handoff.toVolunteerId, {
+      title: "Handoff request withdrawn",
+      body: "The other volunteer withdrew their delivery handoff request.",
+      data: { type: "handoff.cancelled", deliveryId: handoff.deliveryId },
+    });
+
+    return res.json({ id: req.params.id, status: "cancelled" });
+  } catch (err) {
+    console.error("Cancel handoff error:", err.message);
+    return res.status(500).json({ error: "Failed to cancel handoff.", details: err.message });
   }
 });
 

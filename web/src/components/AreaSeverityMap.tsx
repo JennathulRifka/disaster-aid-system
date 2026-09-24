@@ -8,6 +8,7 @@ import { CheckCircle2, AlertTriangle, AlertOctagon, HelpCircle } from "lucide-re
 import "@/lib/leafletIcons";
 import { apiFetch } from "@/lib/api";
 import { CountrySearchBox, type CountryFeature } from "@/components/CountrySearchBox";
+import { DistrictSearchBox, type DistrictOption } from "@/components/DistrictSearchBox";
 
 interface AreaStat {
   district: string;
@@ -244,10 +245,14 @@ function MapViewController({
   viewMode,
   earthquakeScope,
   selectedCountry,
+  selectedDistrict,
+  boundaries,
 }: {
   viewMode: ViewMode;
   earthquakeScope: "sri-lanka" | "regional";
   selectedCountry: CountryFeature | null;
+  selectedDistrict: DistrictOption | null;
+  boundaries: FeatureCollection<any, DistrictBoundaryProps> | null;
 }) {
   const map = useMap();
   useEffect(() => {
@@ -261,9 +266,26 @@ function MapViewController({
         return;
       }
     }
+    // Same idea for the Flood Risk Forecast tab's district search — this map
+    // (unlike admin's SituationMap.tsx, which only ever has centroids to zoom
+    // to) already has the real district boundary polygons loaded for this
+    // exact tab, so fit to the actual shape rather than a fixed-zoom pan to
+    // the centroid — sharper zoom, no new fetch needed.
+    if (viewMode === "floodRisk" && selectedDistrict) {
+      const feature = boundaries?.features.find((f) => f.properties.district === selectedDistrict.name);
+      const bounds = feature ? leafletGeoJSON(feature as any).getBounds() : null;
+      if (bounds && bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [24, 24] });
+        return;
+      }
+      // Boundaries not loaded yet (or no matching feature) — fall back to a
+      // fixed-zoom pan to the centroid, same as admin's implementation.
+      map.setView([selectedDistrict.lat, selectedDistrict.lng], 10);
+      return;
+    }
     const regional = viewMode === "earthquakes" && earthquakeScope === "regional";
     map.setView(regional ? REGIONAL_CENTER : SRI_LANKA_CENTER, regional ? 5 : 7);
-  }, [viewMode, earthquakeScope, selectedCountry, map]);
+  }, [viewMode, earthquakeScope, selectedCountry, selectedDistrict, boundaries, map]);
   return null;
 }
 
@@ -287,6 +309,7 @@ export function AreaSeverityMap({
 }) {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>("areas");
+  const [selectedDistrict, setSelectedDistrict] = useState<DistrictOption | null>(null);
   const [areas, setAreas] = useState<AreaStat[]>([]);
   const [gauges, setGauges] = useState<GaugeStation[]>([]);
   const [reservoirs, setReservoirs] = useState<Reservoir[]>([]);
@@ -422,6 +445,7 @@ export function AreaSeverityMap({
   }
 
   const showCountrySearch = (viewMode === "gdacs" || viewMode === "earthquakes") && countriesLoaded;
+  const showDistrictSearch = viewMode === "floodRisk";
 
   return (
     <>
@@ -488,6 +512,13 @@ export function AreaSeverityMap({
                 onSelect={setSelectedCountry}
                 onClear={() => setSelectedCountry(null)}
                 selectedName={selectedCountry?.properties.name || null}
+              />
+            )}
+            {showDistrictSearch && (
+              <DistrictSearchBox
+                onSelect={setSelectedDistrict}
+                onClear={() => setSelectedDistrict(null)}
+                selectedName={selectedDistrict?.name || null}
               />
             )}
           </div>
@@ -608,7 +639,13 @@ export function AreaSeverityMap({
 
       <div className="overflow-hidden rounded-xl border border-gray-200" style={{ height }}>
         <MapContainer center={SRI_LANKA_CENTER} zoom={7} style={{ height: "100%", width: "100%" }}>
-          <MapViewController viewMode={viewMode} earthquakeScope={earthquakeScope} selectedCountry={selectedCountry} />
+          <MapViewController
+            viewMode={viewMode}
+            earthquakeScope={earthquakeScope}
+            selectedCountry={selectedCountry}
+            selectedDistrict={selectedDistrict}
+            boundaries={boundaries}
+          />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -664,13 +701,18 @@ export function AreaSeverityMap({
               key={`flood-risk-${floodRisk.map((f) => `${f.district}:${f.riskLevel}`).join(",")}`}
               data={boundaries}
               style={(feature?: Feature<any, DistrictBoundaryProps>): PathOptions => {
-                const match = floodRisk.find((f) => f.district === feature?.properties.district);
+                // A district can have a matching entry that FAILED to fetch
+                // (`{district, month, error: true}`, no riskLevel/probability
+                // — see GET /api/external/flood-risk's per-district fail-soft
+                // shape) — that's not the same as no match at all, so it's
+                // checked separately rather than folded into `!match`.
+                const match = floodRisk.find((f) => f.district === feature?.properties.district && !f.error);
                 const color = FLOOD_RISK_COLOR[match?.riskLevel ?? "low"];
                 return { color, weight: 1.2, fillColor: color, fillOpacity: match ? 0.45 : 0.1 };
               }}
               onEachFeature={(feature: Feature<any, DistrictBoundaryProps>, layer: Layer) => {
                 if (!showPopups) return;
-                const match = floodRisk.find((f) => f.district === feature.properties.district);
+                const match = floodRisk.find((f) => f.district === feature.properties.district && !f.error);
                 if (!match) return;
                 layer.bindPopup(
                   `<strong>${match.district}</strong><br/>` +

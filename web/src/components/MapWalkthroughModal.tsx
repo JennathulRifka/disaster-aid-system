@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 
 const STEPS = [
   { titleKey: "mapWalkthrough.step1Title", bodyKey: "mapWalkthrough.step1Body" },
@@ -21,6 +22,7 @@ const STEPS = [
 export function MapWalkthroughModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const [step, setStep] = useState(0);
+  const dialogRef = useDialogA11y(open, close);
 
   if (!open) return null;
 
@@ -33,7 +35,14 @@ export function MapWalkthroughModal({ open, onClose }: { open: boolean; onClose:
   }
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 p-4">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="map-walkthrough-dialog-title"
+      tabIndex={-1}
+      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 p-4"
+    >
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between">
           <p className="text-xs font-medium uppercase tracking-wide text-orange-600">
@@ -43,8 +52,12 @@ export function MapWalkthroughModal({ open, onClose }: { open: boolean; onClose:
             <X size={18} />
           </button>
         </div>
-        <h3 className="mt-2 text-lg font-semibold text-gray-900">{t(current.titleKey)}</h3>
-        <p className="mt-2 text-sm text-gray-600">{t(current.bodyKey)}</p>
+        <div aria-live="polite">
+          <h3 id="map-walkthrough-dialog-title" className="mt-2 text-lg font-semibold text-gray-900">
+            {t(current.titleKey)}
+          </h3>
+          <p className="mt-2 text-sm text-gray-600">{t(current.bodyKey)}</p>
+        </div>
         <div className="mt-5 flex items-center justify-between">
           <button onClick={close} className="text-sm text-gray-500 hover:underline">
             {t("common.skip")}

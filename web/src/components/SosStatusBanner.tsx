@@ -41,8 +41,14 @@ export function SosStatusBanner() {
   if (!active) return null;
 
   return (
-    <div className={`border-b px-4 py-3 text-sm ${STATUS_STYLE[active.status]}`}>
-      <span className="font-semibold">🆘 {t("sos.bannerLabel")}: </span>
+    <div
+      role="status"
+      aria-live="assertive"
+      className={`border-b px-4 py-3 text-sm ${STATUS_STYLE[active.status]}`}
+    >
+      <span className="font-semibold">
+        <span aria-hidden="true">🆘</span> {t("sos.bannerLabel")}:{" "}
+      </span>
       {t(`sos.status.${active.status}`)}
     </div>
   );

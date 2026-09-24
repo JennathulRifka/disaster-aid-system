@@ -15,6 +15,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../navigation/types";
 import { registerUser, type UserRole } from "../../lib/auth";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
+import { PasswordInput } from "../../components/PasswordInput";
 import { normalizeSriLankanPhone } from "../../lib/phone";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
@@ -71,7 +72,7 @@ export function RegisterScreen({ navigation }: Props) {
 
           <View className="mb-4">
             <Text className={labelClass}>{t("auth.fullName")}</Text>
-            <TextInput value={name} onChangeText={setName} className={inputClass} />
+            <TextInput value={name} onChangeText={setName} accessibilityLabel={t("auth.fullName")} className={inputClass} />
           </View>
 
           <View className="mb-4">
@@ -81,13 +82,14 @@ export function RegisterScreen({ navigation }: Props) {
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
+              accessibilityLabel={t("auth.email")}
               className={inputClass}
             />
           </View>
 
           <View className="mb-4">
             <Text className={labelClass}>{t("auth.password")}</Text>
-            <TextInput secureTextEntry value={password} onChangeText={setPassword} className={inputClass} />
+            <PasswordInput value={password} onChangeText={setPassword} accessibilityLabel={t("auth.password")} className={inputClass} />
           </View>
 
           <View className="mb-4">
@@ -97,6 +99,7 @@ export function RegisterScreen({ navigation }: Props) {
               value={phone}
               onChangeText={setPhone}
               placeholder="0771234567"
+              accessibilityLabel={t("auth.phone")}
               className={inputClass}
             />
             <Text className="mt-1 text-xs text-gray-400">Sri Lankan mobile number — used for SMS status alerts.</Text>
@@ -105,7 +108,7 @@ export function RegisterScreen({ navigation }: Props) {
           <View className="mb-4">
             <Text className={labelClass}>{t("auth.iAmA")}</Text>
             <View className="rounded border border-gray-300">
-              <Picker selectedValue={role} onValueChange={(v) => setRole(v as UserRole)}>
+              <Picker selectedValue={role} onValueChange={(v) => setRole(v as UserRole)} accessibilityLabel={t("auth.iAmA")}>
                 <Picker.Item label={t("auth.roleVictim")} value="victim" />
                 <Picker.Item label={t("auth.roleDonor")} value="donor" />
                 <Picker.Item label={t("auth.roleVolunteer")} value="volunteer" />
@@ -118,12 +121,17 @@ export function RegisterScreen({ navigation }: Props) {
             <>
               <View className="mb-4">
                 <Text className={labelClass}>{t("auth.nic")}</Text>
-                <TextInput value={nic} onChangeText={setNic} className={inputClass} />
+                <TextInput value={nic} onChangeText={setNic} accessibilityLabel={t("auth.nic")} className={inputClass} />
               </View>
 
               <View className="mb-4">
                 <Text className={labelClass}>{t("auth.homeAddress")}</Text>
-                <TextInput value={homeAddress} onChangeText={setHomeAddress} className={inputClass} />
+                <TextInput
+                  value={homeAddress}
+                  onChangeText={setHomeAddress}
+                  accessibilityLabel={t("auth.homeAddress")}
+                  className={inputClass}
+                />
                 <Text className="mt-1 text-xs text-gray-400">{t("auth.homeAddressHint")}</Text>
               </View>
             </>
@@ -134,6 +142,8 @@ export function RegisterScreen({ navigation }: Props) {
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={loading}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: loading }}
             className="items-center rounded bg-orange-600 py-3"
             style={{ opacity: loading ? 0.5 : 1 }}
           >

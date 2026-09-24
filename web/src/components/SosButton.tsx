@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/api";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 
 type SosType = "trapped" | "missing_person" | "flood_rescue" | "other";
 type LocationStatus = "capturing" | "captured" | "error";
@@ -24,6 +25,7 @@ export function SosButton() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+  const dialogRef = useDialogA11y(open, handleClose);
 
   function captureLocation() {
     setLocationStatus("capturing");
@@ -85,19 +87,26 @@ export function SosButton() {
         onClick={() => setOpen(true)}
         className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-lg hover:bg-red-700"
       >
-        🆘 {t("sos.buttonLabel")}
+        <span aria-hidden="true">🆘</span> {t("sos.buttonLabel")}
       </button>
 
       {open && (
         // z-[1200]: Leaflet's own map panes/controls use raw z-index up to
         // 1000 (not Tailwind's scale), which otherwise renders on top of this
         // modal on any page with a map (/admin/map, /admin/sos).
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sos-dialog-title"
+          tabIndex={-1}
+          className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4"
+        >
           <div className="w-full max-w-sm rounded-xl bg-white p-5">
             {sent ? (
               <div className="text-center">
-                <p className="text-3xl">✅</p>
-                <h3 className="mt-2 text-base font-semibold text-gray-900">{t("sos.sentTitle")}</h3>
+                <p className="text-3xl" aria-hidden="true">✅</p>
+                <h3 id="sos-dialog-title" className="mt-2 text-base font-semibold text-gray-900">{t("sos.sentTitle")}</h3>
                 <p className="mt-1 text-sm text-gray-600">{t("sos.sentBody")}</p>
                 <button
                   onClick={handleClose}
@@ -109,7 +118,9 @@ export function SosButton() {
             ) : (
               <>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-base font-bold text-red-700">🆘 {t("sos.modalTitle")}</h3>
+                  <h3 id="sos-dialog-title" className="text-base font-bold text-red-700">
+                    <span aria-hidden="true">🆘</span> {t("sos.modalTitle")}
+                  </h3>
                   <button onClick={handleClose} className="text-sm text-gray-500 hover:text-gray-700">
                     {t("common.close")}
                   </button>
@@ -117,11 +128,12 @@ export function SosButton() {
 
                 <p className="mb-3 text-xs text-gray-500">{t("sos.modalSubtitle")}</p>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2" role="group" aria-label={t("sos.modalTitle")}>
                   {SOS_TYPE_KEYS.map((key) => (
                     <button
                       key={key}
                       onClick={() => setType(key)}
+                      aria-pressed={type === key}
                       className={`rounded border px-3 py-3 text-sm font-medium ${
                         type === key
                           ? "border-red-600 bg-red-50 text-red-700"
@@ -156,6 +168,7 @@ export function SosButton() {
                   value={peopleCount}
                   onChange={(e) => setPeopleCount(e.target.value)}
                   placeholder={t("sos.peopleCountPlaceholder")}
+                  aria-label={t("sos.peopleCountPlaceholder")}
                   className="mt-3 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 />
                 <textarea
@@ -163,6 +176,7 @@ export function SosButton() {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
                   placeholder={t("sos.descriptionPlaceholder")}
+                  aria-label={t("sos.descriptionPlaceholder")}
                   className="mt-2 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 />
 

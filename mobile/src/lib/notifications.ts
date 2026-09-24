@@ -10,7 +10,7 @@
 // (not Expo's) to be present — see CLAUDE.md's "Push notifications" section
 // for why, and what the user still needs to provide.
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Platform, Linking } from "react-native";
 import { apiFetch } from "./api";
 
 // Wrapped in try/catch, not just async rejection handling — this runs at
@@ -35,7 +35,17 @@ export async function requestAndRegisterPushToken(): Promise<"granted" | "denied
 
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
-    const status = existing === "undetermined" ? (await Notifications.requestPermissionsAsync()).status : existing;
+    // Always attempt the real native prompt unless already granted — not
+    // just when "undetermined". Android still shows the in-app dialog again
+    // after a first "deny" as long as the user hasn't checked "don't ask
+    // again" (canAskAgain stays true); requestPermissionsAsync() itself is
+    // safe to call even when the OS has permanently blocked it — it just
+    // resolves with the still-denied status instead of showing anything, no
+    // crash either way. This is what makes "tap Enable again" actually work
+    // from inside the app instead of silently no-oping the first time it's
+    // ever denied (see getNotificationPermissionState() below for detecting
+    // the truly-locked-out case, which needs a Settings deep link instead).
+    const status = existing === "granted" ? existing : (await Notifications.requestPermissionsAsync()).status;
     if (status !== "granted") return "denied";
 
     const { data: token } = await Notifications.getDevicePushTokenAsync();
@@ -49,6 +59,34 @@ export async function requestAndRegisterPushToken(): Promise<"granted" | "denied
     console.warn("Failed to register push token:", err);
     return "unsupported";
   }
+}
+
+/**
+ * Whether a further in-app permission prompt is still possible, or the OS
+ * has permanently blocked it (Android "don't ask again", or iOS which only
+ * ever prompts once). When `canAskAgain` is false, requestAndRegisterPushToken()
+ * will keep returning "denied" with no UI shown at all — the only remaining
+ * path is the device's own notification settings screen, see
+ * openNotificationSettings() below.
+ */
+export async function getNotificationPermissionState() {
+  try {
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    return { status, canAskAgain };
+  } catch {
+    return { status: Notifications.PermissionStatus.UNDETERMINED, canAskAgain: true };
+  }
+}
+
+/**
+ * One-tap deep link straight into this app's own notification settings
+ * screen — the closest thing to "enable from the app itself" once the OS
+ * has permanently blocked further in-app prompts. No app can force-grant a
+ * permission the user has permanently denied; this at least skips the
+ * "find Settings > Apps > Disaster Aid > Notifications yourself" hunt.
+ */
+export function openNotificationSettings() {
+  Linking.openSettings().catch(() => {});
 }
 
 /** Subscribes to notifications received while the app is foregrounded. Returns an unsubscribe function. */

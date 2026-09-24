@@ -121,11 +121,7 @@ export default function AdminWaterAlerts() {
     <DashboardLayout>
       <h1 className="text-2xl font-semibold text-gray-900">Water Level & Reservoir Area Alerts</h1>
       <p className="mt-1 text-sm text-gray-600">
-        When a river gauge rises into alert/minor-flood/major-flood status, or a reservoir's storage rises into
-        elevated/near-capacity/spilling, victims with an active request in the matching district can be notified
-        automatically or only after you approve it — same "suggestion, not automatic" pattern already used for
-        DMC alerts feeding active-district declarations. Reservoir status reflects the Irrigation Department's own
-        published storage % and spilling flag as of their last daily bulletin — never a prediction of gate openings.
+        Rising gauge/reservoir status can auto-notify victims in the district, or wait for your approval.
       </p>
 
       <div className="mt-6 max-w-xl rounded-xl border border-gray-200 bg-white p-6">

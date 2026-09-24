@@ -1,9 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { apiFetch } from "../../lib/api";
 import { StatusBadge } from "../../components/StatusBadge";
+
+type SortBy = "priority" | "newest" | "status";
+
+const SORT_OPTIONS: { key: SortBy; label: string }[] = [
+  { key: "priority", label: "Priority" },
+  { key: "newest", label: "Newest" },
+  { key: "status", label: "Status" },
+];
+
+const STATUS_ORDER: Record<string, number> = {
+  pending: 0,
+  verified: 1,
+  in_progress: 2,
+  delivered: 3,
+  rejected: 4,
+};
 
 interface RequestItem {
   category: string;
@@ -30,17 +46,28 @@ export function AidRequestsScreen() {
   const [requests, setRequests] = useState<AidRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingOn, setActingOn] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("priority");
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "aidRequests"), (snapshot) => {
-      const data = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }) as AidRequest)
-        .sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0));
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as AidRequest);
       setRequests(data);
       setLoading(false);
     });
     return unsubscribe;
   }, []);
+
+  const sortedRequests = useMemo(() => {
+    const list = [...requests];
+    if (sortBy === "newest") {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === "status") {
+      list.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
+    } else {
+      list.sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0));
+    }
+    return list;
+  }, [requests, sortBy]);
 
   async function handleVerify(id: string, approve: boolean) {
     setActingOn(id);
@@ -63,13 +90,29 @@ export function AidRequestsScreen() {
   return (
     <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16 }}>
       <Text className="text-2xl font-semibold text-gray-900">Aid Requests</Text>
-      <Text className="mt-1 text-xs text-gray-500">Sorted by priority score, highest first</Text>
 
-      {requests.length === 0 ? (
+      <View className="mt-3 flex-row items-center flex-wrap" style={{ gap: 6 }}>
+        <Text className="text-xs text-gray-500">Sort by:</Text>
+        {SORT_OPTIONS.map((opt) => (
+          <TouchableOpacity
+            key={opt.key}
+            onPress={() => setSortBy(opt.key)}
+            className={`rounded-full border px-3 py-1 ${
+              sortBy === opt.key ? "border-orange-600 bg-orange-600" : "border-gray-300 bg-white"
+            }`}
+          >
+            <Text className={`text-xs font-medium ${sortBy === opt.key ? "text-white" : "text-gray-600"}`}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {sortedRequests.length === 0 ? (
         <Text className="mt-4 text-sm text-gray-500">No requests yet.</Text>
       ) : (
         <View className="mt-4" style={{ gap: 12 }}>
-          {requests.map((r) => (
+          {sortedRequests.map((r) => (
             <View key={r.id} className="rounded-xl border border-gray-200 bg-white p-4">
               <View className="flex-row items-start justify-between">
                 <View className="flex-row items-center" style={{ gap: 8 }}>

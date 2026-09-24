@@ -62,8 +62,8 @@ export function CommunityReportsScreen() {
     <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16 }}>
       <Text className="text-2xl font-semibold text-gray-900">Community Reports</Text>
       <Text className="mt-1 text-sm text-gray-600">
-        Road closures and water conditions reported by volunteers. Verify before they're shown publicly —
-        verifying can also declare the district an active emergency in one step.
+        Volunteer field reports. Verify before they're shown publicly — verifying can also declare an active
+        emergency in one step.
       </Text>
 
       <View className="mt-4 rounded-xl border border-gray-200 bg-white p-4">

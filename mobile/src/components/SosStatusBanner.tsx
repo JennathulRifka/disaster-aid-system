@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { View, Text } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { View, Text, AccessibilityInfo } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
@@ -30,7 +31,9 @@ const STATUS_LABEL: Record<string, string> = {
  */
 export function SosStatusBanner() {
   const { profile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [active, setActive] = useState<SosReport | null>(null);
+  const lastAnnouncedStatus = useRef<string | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -43,13 +46,43 @@ export function SosStatusBanner() {
     return unsubscribe;
   }, [profile]);
 
+  // The one place in the app where "live" matters most (see the file
+  // comment above) — accessibilityLiveRegion alone only covers Android, so
+  // an explicit AccessibilityInfo announcement on every real status change
+  // is what actually gets this heard on both platforms without the user
+  // needing to have this banner in view or in focus.
+  useEffect(() => {
+    if (!active) {
+      lastAnnouncedStatus.current = null;
+      return;
+    }
+    if (lastAnnouncedStatus.current === active.status) return;
+    lastAnnouncedStatus.current = active.status;
+    AccessibilityInfo.announceForAccessibility(
+      `SOS status update: ${STATUS_LABEL[active.status] || active.status}`
+    );
+  }, [active]);
+
   if (!active) return null;
   const style = STATUS_STYLE[active.status] || STATUS_STYLE.pending;
 
   return (
-    <View className={`border-b border-gray-200 px-4 py-3 ${style.bg}`}>
+    <View
+      className={`border-b border-gray-200 px-4 pb-3 ${style.bg}`}
+      // This View renders as the very first thing in RootNavigator.tsx,
+      // above NavigationContainer — none of React Navigation's own
+      // safe-area handling (which every screen's header gets automatically)
+      // applies here, so without an explicit top inset this banner collides
+      // with the status bar/notch instead of sitting below it.
+      style={{ paddingTop: insets.top + 12 }}
+      accessibilityLiveRegion="polite"
+      accessibilityRole="alert"
+    >
       <Text className={`text-sm ${style.text}`}>
-        <Text className="font-semibold">🆘 Your SOS: </Text>
+        <Text className="font-semibold" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          🆘{" "}
+        </Text>
+        <Text className="font-semibold">Your SOS: </Text>
         {STATUS_LABEL[active.status] || active.status}
       </Text>
     </View>

@@ -11,6 +11,8 @@ interface Donation {
   donorName: string;
   category: string;
   quantity: string;
+  quantityValue?: number;
+  remainingQuantity?: number;
   status: string;
   deliveryMethod: "self" | "volunteer";
   matchedRequestId: string | null;
@@ -202,7 +204,20 @@ export default function AdminDonations() {
                 <tr key={d.id}>
                   <td className="px-4 py-3">{d.donorName}</td>
                   <td className="px-4 py-3 capitalize">{d.category}</td>
-                  <td className="px-4 py-3">{d.quantity}</td>
+                  <td className="px-4 py-3">
+                    {d.quantity}
+                    {/* A donation can be matched more than once now — once it has
+                        leftover remainingQuantity, it stays "available" for a
+                        future match instead of a one-shot lifecycle (see
+                        "Donation leftover-quantity tracking" in CLAUDE.md).
+                        Only shown when it differs from the original amount, so
+                        a never-touched donation's row looks exactly as before. */}
+                    {typeof d.remainingQuantity === "number" &&
+                      typeof d.quantityValue === "number" &&
+                      d.remainingQuantity < d.quantityValue && (
+                        <span className="ml-1 text-xs text-gray-500">({d.remainingQuantity} left)</span>
+                      )}
+                  </td>
                   <td className="px-4 py-3 text-xs text-gray-500">
                     {d.deliveryMethod === "self" ? "Self-delivery" : "Volunteer"}
                   </td>

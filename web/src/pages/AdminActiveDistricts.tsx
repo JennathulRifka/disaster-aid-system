@@ -53,9 +53,8 @@ export default function AdminActiveDistricts() {
     <DashboardLayout>
       <h1 className="text-2xl font-semibold text-gray-900">Active Emergency Districts</h1>
       <p className="mt-1 text-sm text-gray-600">
-        Mark specific districts as an active emergency — Sri Lanka's disasters are usually localized, so this
-        is per-district, not a single system-wide switch. Victim submissions are never blocked either way;
-        this only drives the soft in-area note and the public emergency banner.
+        Mark individual districts as an active emergency. Never blocks victim submissions — only drives the
+        soft in-area note and the public banner.
       </p>
 
       {loading ? (

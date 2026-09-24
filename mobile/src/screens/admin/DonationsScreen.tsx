@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -6,11 +6,27 @@ import { db } from "../../lib/firebase";
 import { apiFetch } from "../../lib/api";
 import { StatusBadge } from "../../components/StatusBadge";
 
+type SortBy = "newest" | "status" | "category";
+
+const SORT_OPTIONS: { key: SortBy; label: string }[] = [
+  { key: "newest", label: "Newest" },
+  { key: "status", label: "Status" },
+  { key: "category", label: "Category" },
+];
+
+const STATUS_ORDER: Record<string, number> = {
+  available: 0,
+  matched: 1,
+  delivered: 2,
+};
+
 interface Donation {
   id: string;
   donorName: string;
   category: string;
   quantity: string;
+  quantityValue?: number;
+  remainingQuantity?: number;
   status: string;
   deliveryMethod: "self" | "volunteer";
   matchedRequestId: string | null;
@@ -37,6 +53,7 @@ export function DonationsScreen() {
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [selectedVolunteer, setSelectedVolunteer] = useState<Record<string, string>>({});
+  const [sortBy, setSortBy] = useState<SortBy>("newest");
 
   useEffect(() => {
     apiFetch("/api/users/volunteers").then(setVolunteers);
@@ -51,6 +68,18 @@ export function DonationsScreen() {
     });
     return unsubscribe;
   }, []);
+
+  const sortedDonations = useMemo(() => {
+    const list = [...donations];
+    if (sortBy === "status") {
+      list.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
+    } else if (sortBy === "category") {
+      list.sort((a, b) => a.category.localeCompare(b.category));
+    } else {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    return list;
+  }, [donations, sortBy]);
 
   async function handleMatch(id: string) {
     setActingOn(id);
@@ -100,22 +129,44 @@ export function DonationsScreen() {
     <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16 }}>
       <Text className="text-2xl font-semibold text-gray-900">Donations</Text>
 
+      <View className="mt-3 flex-row items-center flex-wrap" style={{ gap: 6 }}>
+        <Text className="text-xs text-gray-500">Sort by:</Text>
+        {SORT_OPTIONS.map((opt) => (
+          <TouchableOpacity
+            key={opt.key}
+            onPress={() => setSortBy(opt.key)}
+            className={`rounded-full border px-3 py-1 ${
+              sortBy === opt.key ? "border-orange-600 bg-orange-600" : "border-gray-300 bg-white"
+            }`}
+          >
+            <Text className={`text-xs font-medium ${sortBy === opt.key ? "text-white" : "text-gray-600"}`}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {message ? (
         <View className="mt-3 rounded border border-blue-200 bg-blue-50 px-3 py-2">
           <Text className="text-sm text-blue-800">{message}</Text>
         </View>
       ) : null}
 
-      {donations.length === 0 ? (
+      {sortedDonations.length === 0 ? (
         <Text className="mt-4 text-sm text-gray-500">No donations yet.</Text>
       ) : (
         <View className="mt-4" style={{ gap: 12 }}>
-          {donations.map((d) => (
+          {sortedDonations.map((d) => (
             <View key={d.id} className="rounded-xl border border-gray-200 bg-white p-4">
               <View className="flex-row items-start justify-between">
                 <View className="flex-1 pr-2">
                   <Text className="text-sm font-medium capitalize text-gray-900">
                     {d.category} — {d.quantity}
+                    {typeof d.remainingQuantity === "number" &&
+                      typeof d.quantityValue === "number" &&
+                      d.remainingQuantity < d.quantityValue && (
+                        <Text className="text-xs font-normal text-gray-500"> ({d.remainingQuantity} left)</Text>
+                      )}
                   </Text>
                   <Text className="text-xs text-gray-500">
                     {d.donorName} · {d.deliveryMethod === "self" ? "Self-delivery" : "Volunteer"}

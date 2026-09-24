@@ -29,9 +29,9 @@ interface WeatherCity {
 }
 
 const HOW_IT_WORKS = [
-  { icon: FileEdit, titleKey: "landing.step1Title", descKey: "landing.step1Desc" },
-  { icon: Users2, titleKey: "landing.step2Title", descKey: "landing.step2Desc" },
-  { icon: PackageCheck, titleKey: "landing.step3Title", descKey: "landing.step3Desc" },
+  { icon: FileEdit, titleKey: "landing.step1Title", shortDescKey: "landing.step1ShortDesc" },
+  { icon: Users2, titleKey: "landing.step2Title", shortDescKey: "landing.step2ShortDesc" },
+  { icon: PackageCheck, titleKey: "landing.step3Title", shortDescKey: "landing.step3ShortDesc" },
 ];
 
 export default function Landing() {
@@ -88,7 +88,7 @@ export default function Landing() {
           aria-hidden="true"
         />
 
-        <div className="relative mx-auto max-w-3xl px-8 py-24 text-center">
+        <div className="relative mx-auto max-w-3xl px-8 pb-8 pt-16 text-center sm:pt-20">
           <h2 className="text-4xl font-bold leading-tight text-gray-900">{t("landing.heroTitle")}</h2>
           <p className="mt-4 text-lg text-gray-600">{t("landing.heroSubtitle")}</p>
           <div className="mt-8 flex justify-center gap-4">
@@ -107,7 +107,7 @@ export default function Landing() {
           </div>
 
           {stats && (
-            <div className="mt-14 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <StatCard label={t("landing.statRequests")} value={stats.totalRequests} />
               <StatCard label={t("landing.statDeliveries")} value={stats.completedDeliveries} />
               <StatCard label={t("landing.statVolunteers")} value={stats.totalVolunteers} />
@@ -128,20 +128,17 @@ export default function Landing() {
       </section>
 
       <ScrollReveal>
-        <section className="mx-auto max-w-4xl px-8 py-16">
-          <h3 className="text-center text-xl font-semibold text-gray-900">{t("landing.howItWorksTitle")}</h3>
-          <div className="relative mt-10 grid grid-cols-1 gap-10 sm:grid-cols-3">
-            <div className="absolute left-0 right-0 top-6 hidden h-px bg-gray-200 sm:block" />
-            {HOW_IT_WORKS.map((step, i) => (
-              <div key={step.titleKey} className="relative flex flex-col items-center text-center">
-                <div className="z-10 flex h-12 w-12 items-center justify-center rounded-full bg-orange-600 text-white shadow-sm">
-                  <step.icon size={22} />
+        <section className="mx-auto max-w-4xl px-8 pb-8 pt-2">
+          <div className="flex flex-wrap items-start justify-center gap-x-10 gap-y-4">
+            {HOW_IT_WORKS.map((step) => (
+              <div key={step.titleKey} className="flex max-w-[180px] items-start gap-2">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-600">
+                  <step.icon size={15} />
                 </div>
-                <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-orange-600">
-                  {t("common.step", { number: i + 1 })}
-                </p>
-                <h4 className="mt-1 font-semibold text-gray-900">{t(step.titleKey)}</h4>
-                <p className="mt-1 text-sm text-gray-600">{t(step.descKey)}</p>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{t(step.titleKey)}</p>
+                  <p className="text-xs text-gray-500">{t(step.shortDescKey)}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -149,20 +146,7 @@ export default function Landing() {
       </ScrollReveal>
 
       <ScrollReveal>
-        <section className="mx-auto max-w-4xl px-8 pb-16">
-          <div className="mb-4 flex items-end justify-between">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900">{t("landing.affectedAreasTitle")}</h3>
-              <p className="mt-1 text-sm text-gray-600">{t("landing.affectedAreasDesc")}</p>
-            </div>
-            <Link
-              to="/severity-map"
-              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 transition hover:border-orange-300 hover:bg-orange-100"
-            >
-              <Map className="h-4 w-4" />
-              {t("landing.viewFullMap")}
-            </Link>
-          </div>
+        <section className="mx-auto max-w-4xl px-8 pb-12">
           {weather.length > 0 && (
             <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
               <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -190,26 +174,47 @@ export default function Landing() {
               </div>
             </div>
           )}
+          <div className="mb-4 flex items-end justify-between">
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900">{t("landing.affectedAreasTitle")}</h3>
+              <p className="mt-1 text-sm text-gray-600">{t("landing.affectedAreasDesc")}</p>
+            </div>
+            <Link
+              to="/severity-map"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 transition hover:border-orange-300 hover:bg-orange-100"
+            >
+              <Map className="h-4 w-4" />
+              {t("landing.viewFullMap")}
+            </Link>
+          </div>
           <AreaSeverityMap height="420px" extraLayers />
         </section>
       </ScrollReveal>
 
       <ScrollReveal>
-        <section className="mx-auto grid max-w-4xl grid-cols-1 gap-6 px-8 pb-24 sm:grid-cols-3">
-          <div className="rounded-xl border border-gray-200 p-6 transition hover:-translate-y-1 hover:shadow-md">
-            <LifeBuoy className="text-slate-700" size={24} />
-            <h3 className="mt-3 font-semibold text-gray-900">{t("landing.forVictimsTitle")}</h3>
-            <p className="mt-2 text-sm text-gray-600">{t("landing.forVictimsDesc")}</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 p-6 transition hover:-translate-y-1 hover:shadow-md">
-            <Gift className="text-slate-700" size={24} />
-            <h3 className="mt-3 font-semibold text-gray-900">{t("landing.forDonorsTitle")}</h3>
-            <p className="mt-2 text-sm text-gray-600">{t("landing.forDonorsDesc")}</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 p-6 transition hover:-translate-y-1 hover:shadow-md">
-            <Truck className="text-slate-700" size={24} />
-            <h3 className="mt-3 font-semibold text-gray-900">{t("landing.forVolunteersTitle")}</h3>
-            <p className="mt-2 text-sm text-gray-600">{t("landing.forVolunteersDesc")}</p>
+        <section className="mx-auto max-w-4xl px-8 pb-12">
+          <div className="flex flex-wrap items-start justify-center gap-x-10 gap-y-4">
+            <div className="flex max-w-[180px] items-start gap-2">
+              <LifeBuoy className="mt-0.5 shrink-0 text-slate-700" size={18} />
+              <div>
+                <p className="text-sm font-medium text-gray-800">{t("landing.forVictimsTitle")}</p>
+                <p className="text-xs text-gray-500">{t("landing.forVictimsShortDesc")}</p>
+              </div>
+            </div>
+            <div className="flex max-w-[180px] items-start gap-2">
+              <Gift className="mt-0.5 shrink-0 text-slate-700" size={18} />
+              <div>
+                <p className="text-sm font-medium text-gray-800">{t("landing.forDonorsTitle")}</p>
+                <p className="text-xs text-gray-500">{t("landing.forDonorsShortDesc")}</p>
+              </div>
+            </div>
+            <div className="flex max-w-[180px] items-start gap-2">
+              <Truck className="mt-0.5 shrink-0 text-slate-700" size={18} />
+              <div>
+                <p className="text-sm font-medium text-gray-800">{t("landing.forVolunteersTitle")}</p>
+                <p className="text-xs text-gray-500">{t("landing.forVolunteersShortDesc")}</p>
+              </div>
+            </div>
           </div>
         </section>
       </ScrollReveal>

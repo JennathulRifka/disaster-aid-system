@@ -132,5 +132,35 @@ service cloud.firestore {
                      userRole() == "admin");
       allow write: if false;
     }
+
+    // Delivery handoffs (Fellow Travellers Phase 2, see CLAUDE.md) — a
+    // volunteer proposing to transfer their already-accepted delivery to
+    // another volunteer, confirmation required. Both volunteers need a live
+    // listener (incoming/outgoing requests should appear without a manual
+    // refresh, same reasoning as sosRequests above), so this is
+    // load-bearing. All writes go through the handoff API
+    // (server/src/routes/deliveries.js's POST/PATCH .../handoff* routes) so
+    // the business rules (only one pending handoff per delivery, re-
+    // validating the match, only the named recipient can accept/decline)
+    // stay in one place — direct client writes are blocked for every role.
+    match /deliveryHandoffs/{handoffId} {
+      allow read: if isSignedIn() &&
+                    (resource.data.fromVolunteerId == request.auth.uid ||
+                     resource.data.toVolunteerId == request.auth.uid ||
+                     userRole() == "admin");
+      allow write: if false;
+    }
+
+    // In-app notification history (see server/src/utils/notifications.js) —
+    // the Notifications screen reads this live via onSnapshot, so this rule
+    // is load-bearing. Strictly owner-only, no admin carve-out (unlike most
+    // other collections here) — there's no legitimate reason for an admin to
+    // browse another user's personal notification feed. All writes
+    // (creation, marking read) go through the Express API, never a direct
+    // client write.
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
   }
 }

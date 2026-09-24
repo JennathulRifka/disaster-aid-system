@@ -88,8 +88,7 @@ export default function AdminSos() {
         <p className="text-sm text-gray-500">{unresolved.length} unresolved</p>
       </div>
       <p className="mt-1 text-sm text-gray-600">
-        Life-safety reports — trapped, missing persons, flood rescue — separate from aid requests. Status only:
-        acknowledge, mark in progress while you coordinate a response, then resolve. This board updates live.
+        Life-safety reports, separate from aid requests. Acknowledge, mark in progress, then resolve — updates live.
       </p>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-gray-200" style={{ height: "400px" }}>

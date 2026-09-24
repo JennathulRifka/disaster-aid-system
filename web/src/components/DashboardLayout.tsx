@@ -22,6 +22,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
   donor: [
     { labelKey: "nav.registerDonation", path: "/donations/new" },
     { labelKey: "nav.myDonations", path: "/donations/mine" },
+    { labelKey: "nav.districtNeed", path: "/donations/district-need" },
   ],
   admin: [
     { labelKey: "nav.sosDispatch", path: "/admin/sos" },
@@ -34,6 +35,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { labelKey: "nav.waterAlerts", path: "/admin/water-alerts" },
     { labelKey: "nav.communityReports", path: "/admin/community-reports" },
     { labelKey: "nav.resourceGap", path: "/admin/resource-gap" },
+    { labelKey: "nav.districtInventory", path: "/admin/district-inventory" },
     { labelKey: "nav.auditLog", path: "/admin/audit-log" },
     { labelKey: "nav.volunteerWorkload", path: "/admin/volunteer-workload" },
   ],

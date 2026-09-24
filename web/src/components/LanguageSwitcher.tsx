@@ -12,11 +12,16 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
   const { i18n } = useTranslation();
 
   return (
-    <div className={`flex items-center gap-1 rounded border border-gray-300 p-0.5 text-xs ${className}`}>
+    <div
+      role="group"
+      aria-label="Language"
+      className={`flex items-center gap-1 rounded border border-gray-300 p-0.5 text-xs ${className}`}
+    >
       {LANGUAGES.map((lang) => (
         <button
           key={lang.code}
           onClick={() => i18n.changeLanguage(lang.code)}
+          aria-pressed={i18n.resolvedLanguage === lang.code}
           className={`rounded px-2 py-1 font-medium ${
             i18n.resolvedLanguage === lang.code
               ? "bg-orange-600 text-white"

@@ -68,7 +68,11 @@ export function EmergencyBanner() {
   return (
     <div>
       {showDistrictsBar && (
-        <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-3 border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+        >
           <AlertTriangle size={18} className="shrink-0" />
           <span className="flex-1">
             <span className="font-semibold">{t("emergencyBanner.activeDistrictsLabel")}: </span>
@@ -84,7 +88,11 @@ export function EmergencyBanner() {
         </div>
       )}
       {broadcast && (
-        <div className={`flex items-center gap-3 border-b px-4 py-3 text-sm ${SEVERITY_STYLES[broadcast.severity]}`}>
+        <div
+          role="alert"
+          aria-live="assertive"
+          className={`flex items-center gap-3 border-b px-4 py-3 text-sm ${SEVERITY_STYLES[broadcast.severity]}`}
+        >
           <AlertTriangle size={18} className="shrink-0" />
           <span className="flex-1">
             <span className="font-semibold">{t("emergencyBanner.label")}: </span>

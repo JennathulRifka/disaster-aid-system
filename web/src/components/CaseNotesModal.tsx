@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch } from "@/lib/api";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 
 interface CaseNote {
   id: string;
@@ -22,6 +23,7 @@ export function CaseNotesModal({
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+  const dialogRef = useDialogA11y(true, onClose);
 
   async function load() {
     setLoading(true);
@@ -58,10 +60,17 @@ export function CaseNotesModal({
     // z-[1200]: above Leaflet's own map panes/controls (raw z-index up to 1000),
     // same fix as SosButton.tsx's modal, kept consistent in case this is ever
     // opened over a page with a map.
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="case-notes-dialog-title"
+      tabIndex={-1}
+      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4"
+    >
       <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Case notes — {victimName}</h3>
+          <h3 id="case-notes-dialog-title" className="text-sm font-semibold text-gray-900">Case notes — {victimName}</h3>
           <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">
             Close
           </button>
@@ -93,6 +102,7 @@ export function CaseNotesModal({
             onChange={(e) => setText(e.target.value)}
             rows={2}
             placeholder="e.g. Called the victim, they confirmed access road is passable."
+            aria-label="New case note"
             className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
           />
           <button

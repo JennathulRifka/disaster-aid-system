@@ -57,8 +57,8 @@ export function ActiveDistrictsScreen() {
     <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16 }}>
       <Text className="text-2xl font-semibold text-gray-900">Active Emergency Districts</Text>
       <Text className="mt-1 text-sm text-gray-600">
-        Mark specific districts as an active emergency. Victim submissions are never blocked either way — this
-        only drives the soft in-area note and the public emergency banner.
+        Mark individual districts as an active emergency. Never blocks victim submissions — only drives the
+        soft in-area note and the public banner.
       </Text>
 
       <View className="mt-4" style={{ gap: 8 }}>

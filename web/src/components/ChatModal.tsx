@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { db } from "@/lib/firebase";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useDialogA11y } from "@/hooks/useDialogA11y";
 
 interface ChatDoc {
   partyAId: string;
@@ -48,6 +49,7 @@ export function ChatModal({ chatId, onClose }: { chatId: string; onClose: () => 
   const [error, setError] = useState("");
   const [contact, setContact] = useState<Contact | null>(null);
   const [consenting, setConsenting] = useState(false);
+  const dialogRef = useDialogA11y(true, onClose);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "deliveryChats", chatId), (snap) => {
@@ -105,8 +107,15 @@ export function ChatModal({ chatId, onClose }: { chatId: string; onClose: () => 
 
   if (loading || !profile) {
     return (
-      <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4">
-        <div className="w-full max-w-sm rounded-xl bg-white p-4 text-center text-sm text-gray-500">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("common.loading")}
+        tabIndex={-1}
+        className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4"
+      >
+        <div className="w-full max-w-sm rounded-xl bg-white p-4 text-center text-sm text-gray-500" aria-live="polite">
           {t("common.loading")}
         </div>
       </div>
@@ -115,7 +124,14 @@ export function ChatModal({ chatId, onClose }: { chatId: string; onClose: () => 
 
   if (!chat) {
     return (
-      <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("chatModal.notAvailableYet")}
+        tabIndex={-1}
+        className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4"
+      >
         <div className="w-full max-w-sm rounded-xl bg-white p-4 text-center text-sm text-gray-500">
           {t("chatModal.notAvailableYet")}
           <button
@@ -136,14 +152,23 @@ export function ChatModal({ chatId, onClose }: { chatId: string; onClose: () => 
   const locked = chat.status === "locked";
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="chat-dialog-title"
+      tabIndex={-1}
+      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 p-4"
+    >
       <div className="flex max-h-[85vh] w-full max-w-md flex-col rounded-xl bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold capitalize text-gray-900">
+            <h3 id="chat-dialog-title" className="text-sm font-semibold capitalize text-gray-900">
               {t("chatModal.chatWith", { name: contact?.revealed ? contact.name : otherRoleLabel })}
             </h3>
-            {contact?.revealed && contact.phone && <p className="text-xs text-gray-500">{contact.phone}</p>}
+            {contact?.revealed && (
+              <p className="text-xs text-gray-500">{contact.phone || t("chatModal.noPhoneOnFile")}</p>
+            )}
           </div>
           <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">
             {t("common.close")}
@@ -169,7 +194,7 @@ export function ChatModal({ chatId, onClose }: { chatId: string; onClose: () => 
           <p className="mb-2 text-xs text-green-700">{t("chatModal.contactShared")}</p>
         )}
 
-        <div className="flex-1 space-y-2 overflow-y-auto border-t border-gray-100 pt-3">
+        <div className="flex-1 space-y-2 overflow-y-auto border-t border-gray-100 pt-3" aria-live="polite">
           {messages.length === 0 ? (
             <p className="text-sm text-gray-500">{t("chatModal.noMessages")}</p>
           ) : (
@@ -201,6 +226,7 @@ export function ChatModal({ chatId, onClose }: { chatId: string; onClose: () => 
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder={t("chatModal.messagePlaceholder")}
+                aria-label={t("chatModal.messagePlaceholder")}
                 className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
               />
               <button

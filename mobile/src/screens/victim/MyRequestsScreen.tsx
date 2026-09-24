@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useNavigation, type NavigationProp } from "@react-navigation/native";
 import { apiFetch } from "../../lib/api";
 import { StatusBadge } from "../../components/StatusBadge";
 import { QrScanModal } from "../../components/QrScanModal";
+import { deliveryChatId } from "../../lib/deliveryChat";
+import type { VictimTabParamList } from "../../navigation/types";
+
+// Chats open once the delivery is actually linked (immediately for
+// self-delivery, once a volunteer accepts for volunteer-delivery) and stay
+// viewable (read-only once locked) through the rest of the delivery — same
+// gating web's VictimMyRequests.tsx already uses.
+const CHATTABLE_STATUSES = new Set(["accepted", "picked_up", "delivered", "confirmed"]);
 
 interface RequestItem {
   category: string;
@@ -27,10 +36,13 @@ interface Delivery {
   category: string;
   donationId: string;
   status: string;
+  method: "self" | "volunteer";
+  handoffVersion?: number;
 }
 
 export function MyRequestsScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation<NavigationProp<VictimTabParamList>>();
   const [requests, setRequests] = useState<AidRequest[]>([]);
   const [deliveries, setDeliveries] = useState<Record<string, Delivery[]>>({});
   const [loading, setLoading] = useState(true);
@@ -148,37 +160,70 @@ export function MyRequestsScreen() {
                           key={item.category}
                           className="flex-row items-center justify-between border-b border-gray-100 py-2"
                         >
-                          <Text className="text-sm capitalize text-gray-700">
-                            {t(`categories.${item.category}`, item.category)} ×{item.quantity}
-                          </Text>
-                          {item.status === "pending" && (
-                            <Text className="text-xs text-gray-400">{t("victimMyRequests.awaitingMatch")}</Text>
-                          )}
-                          {item.status === "matched" && !delivery && (
-                            <Text className="text-xs text-gray-400">{t("victimMyRequests.awaitingVolunteer")}</Text>
-                          )}
-                          {item.status === "matched" && delivery && delivery.status === "delivered" && (
-                            <TouchableOpacity
-                              disabled={confirmingId === delivery.id}
-                              onPress={() => setScanning(true)}
-                              className="rounded bg-green-600 px-3 py-1"
-                              style={{ opacity: confirmingId === delivery.id ? 0.5 : 1 }}
-                            >
-                              <Text className="text-xs font-medium text-white">
-                                {confirmingId === delivery.id
-                                  ? t("victimMyRequests.confirming")
-                                  : t("victimMyRequests.scanToConfirm")}
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-                          {item.status === "matched" && delivery && delivery.status !== "delivered" && (
-                            <StatusBadge status={delivery.status} />
-                          )}
-                          {item.status === "delivered" && (
-                            <Text className="text-xs font-medium text-green-700">
-                              {t("victimMyRequests.confirmed")}
+                          <View>
+                            <Text className="text-sm capitalize text-gray-700">
+                              {t(`categories.${item.category}`, item.category)} ×{item.quantity}
                             </Text>
-                          )}
+                            {delivery && (
+                              <Text className="text-[11px] text-gray-400">
+                                {t("victimMyRequests.deliveryNumber", { id: delivery.id.slice(0, 6) })}
+                              </Text>
+                            )}
+                          </View>
+                          <View className="flex-row items-center" style={{ gap: 8 }}>
+                            {delivery && CHATTABLE_STATUSES.has(delivery.status) && (
+                              <TouchableOpacity
+                                onPress={() =>
+                                  navigation.navigate("Messages", {
+                                    screen: "ChatThread",
+                                    params: {
+                                      chatId: deliveryChatId(
+                                        delivery.id,
+                                        delivery.method === "self" ? "donor_victim" : "volunteer_victim",
+                                        delivery.handoffVersion
+                                      ),
+                                    },
+                                  })
+                                }
+                                className="rounded border border-gray-300 px-2 py-1"
+                              >
+                                <Text className="text-xs font-medium text-gray-700">
+                                  💬{" "}
+                                  {delivery.method === "self"
+                                    ? t("victimMyRequests.chatWithDonor")
+                                    : t("victimMyRequests.chatWithVolunteer")}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            {item.status === "pending" && (
+                              <Text className="text-xs text-gray-400">{t("victimMyRequests.awaitingMatch")}</Text>
+                            )}
+                            {item.status === "matched" && !delivery && (
+                              <Text className="text-xs text-gray-400">{t("victimMyRequests.awaitingVolunteer")}</Text>
+                            )}
+                            {item.status === "matched" && delivery && delivery.status === "delivered" && (
+                              <TouchableOpacity
+                                disabled={confirmingId === delivery.id}
+                                onPress={() => setScanning(true)}
+                                className="rounded bg-green-600 px-3 py-1"
+                                style={{ opacity: confirmingId === delivery.id ? 0.5 : 1 }}
+                              >
+                                <Text className="text-xs font-medium text-white">
+                                  {confirmingId === delivery.id
+                                    ? t("victimMyRequests.confirming")
+                                    : t("victimMyRequests.scanToConfirm")}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            {item.status === "matched" && delivery && delivery.status !== "delivered" && (
+                              <StatusBadge status={delivery.status} />
+                            )}
+                            {item.status === "delivered" && (
+                              <Text className="text-xs font-medium text-green-700">
+                                {t("victimMyRequests.confirmed")}
+                              </Text>
+                            )}
+                          </View>
                         </View>
                       );
                     })}

@@ -107,8 +107,7 @@ export function WaterAlertsScreen() {
     <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16 }}>
       <Text className="text-2xl font-semibold text-gray-900">Water Level Area Alerts</Text>
       <Text className="mt-1 text-sm text-gray-600">
-        When a river gauge rises into alert/minor-flood/major-flood status, victims in the matching district can
-        be notified automatically or only after you approve it.
+        Rising gauge status can notify victims in the district automatically, or only after your approval.
       </Text>
 
       <View className="mt-4 rounded-xl border border-gray-200 bg-white p-4">

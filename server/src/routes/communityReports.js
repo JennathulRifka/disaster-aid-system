@@ -3,6 +3,7 @@ const { db } = require("../config/firebase");
 const { requireAuth, requireRole } = require("../middleware/authMiddleware");
 const { nearestDistrict } = require("../utils/districts");
 const { logAction } = require("../utils/auditLog");
+const { notifyDistrictActivated } = require("./activeDistricts");
 
 const router = express.Router();
 
@@ -136,6 +137,7 @@ router.patch("/:id/verify", requireAuth, requireRole("admin"), async (req, res) 
         district: report.district,
         sourceAlertTitle: `Community report ${req.params.id}`,
       });
+      await notifyDistrictActivated(report.district, req.user.uid);
     }
 
     await logAction(req.user, approve ? "community_report.verify" : "community_report.dismiss", { type: "communityReport", id: req.params.id }, {

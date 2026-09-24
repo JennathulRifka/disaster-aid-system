@@ -64,9 +64,8 @@ export default function AdminCommunityReports() {
     <DashboardLayout>
       <h1 className="text-2xl font-semibold text-gray-900">Community Reports</h1>
       <p className="mt-1 text-sm text-gray-600">
-        Road closures and water conditions reported by volunteers in the field. Verify before they appear on the
-        situation map or the public severity map — an unverified report is never shown publicly. Verifying can
-        also declare the report's district an active emergency in one step.
+        Volunteer field reports. Verify before they're shown publicly — verifying can also declare an active
+        emergency in one step.
       </p>
 
       <div className="mt-6 max-w-2xl rounded-xl border border-gray-200 bg-white p-6">

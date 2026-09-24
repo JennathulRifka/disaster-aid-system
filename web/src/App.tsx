@@ -25,6 +25,8 @@ import AdminActiveDistricts from "@/pages/AdminActiveDistricts";
 import AdminWaterAlerts from "@/pages/AdminWaterAlerts";
 import AdminSos from "@/pages/AdminSos";
 import AdminCommunityReports from "@/pages/AdminCommunityReports";
+import AdminDistrictInventory from "@/pages/AdminDistrictInventory";
+import DonorDistrictNeed from "@/pages/DonorDistrictNeed";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 export default function App() {
@@ -137,6 +139,22 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <ResourceGapView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/district-inventory"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminDistrictInventory />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/donations/district-need"
+        element={
+          <ProtectedRoute allowedRoles={["donor"]}>
+            <DonorDistrictNeed />
           </ProtectedRoute>
         }
       />

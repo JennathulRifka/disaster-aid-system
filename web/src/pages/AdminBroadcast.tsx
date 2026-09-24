@@ -87,8 +87,7 @@ export default function AdminBroadcast() {
     <DashboardLayout>
       <h1 className="text-2xl font-semibold text-gray-900">Emergency Broadcast Banner</h1>
       <p className="mt-1 text-sm text-gray-600">
-        Post a message shown across the public landing page and every logged-in dashboard — the manual,
-        admin-curated equivalent of the DMC alerts feed.
+        Shown on the public landing page and every dashboard — a manual equivalent of the DMC alerts feed.
       </p>
 
       {error && (

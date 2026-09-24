@@ -65,7 +65,11 @@ export function NotificationSetup() {
         // z-[1200]: above Leaflet's own map panes/controls (raw z-index up to
         // 1000), same fix as SosButton.tsx's modal — this toast can appear
         // over any page, including ones with a map.
-        <div className="fixed bottom-4 right-4 z-[1200] w-80 rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-4 right-4 z-[1200] w-80 rounded-xl border border-gray-200 bg-white p-4 shadow-lg"
+        >
           <p className="text-sm font-semibold text-gray-900">{toast.title}</p>
           {toast.body && <p className="mt-1 text-sm text-gray-600">{toast.body}</p>}
         </div>

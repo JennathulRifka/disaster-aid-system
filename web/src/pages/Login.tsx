@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { loginUser } from "@/lib/auth";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -55,8 +56,7 @@ export default function Login() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">{t("auth.password")}</label>
-            <input
-              type="password"
+            <PasswordInput
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
