@@ -203,6 +203,7 @@ async function main() {
       body: JSON.stringify({
         category: "food",
         quantity: "1 pack",
+        quantityValue: 1,
         deliveryMethod: "self",
         location: { lat: 6.9271, lng: 79.8612 },
       }),
