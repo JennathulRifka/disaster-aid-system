@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -19,6 +19,12 @@ interface Donation {
   assignedDeliveryId: string | null;
   deliveryStatus: string | null;
   lastRejectionReason?: string | null;
+  // Set when this donation was created as part of a multi-category drop-off
+  // (see "Donation batching" in CLAUDE.md) — dropoffId is shared across every
+  // sibling donation from that same submission, dropoffItemCount is the
+  // total. Both are null/1 for a lone single-category donation.
+  dropoffId?: string | null;
+  dropoffItemCount?: number;
   createdAt: string;
 }
 
@@ -29,6 +35,205 @@ interface Volunteer {
   name: string;
   email: string;
   available?: boolean;
+}
+
+// Same "active vs. done" split as AdminRequests.tsx — still-actionable
+// donations (available/matched, i.e. anything an admin might still need to
+// find a match or assign a volunteer for) stay on top; fully delivered ones
+// move below so the table stays scannable as it grows.
+const ACTIVE_DONATION_STATUSES = new Set(["available", "matched"]);
+const DONE_DONATION_STATUSES = new Set(["delivered"]);
+
+interface DonationsTableProps {
+  title: string;
+  subtitle: string;
+  rows: Donation[];
+  emptyMessage: string;
+  actingOn: string | null;
+  handleMatch: (id: string) => void;
+  selectedVolunteer: Record<string, string>;
+  setSelectedVolunteer: Dispatch<SetStateAction<Record<string, string>>>;
+  handleAssignVolunteer: (donation: Donation, isReassign: boolean) => void;
+  availableVolunteers: Volunteer[];
+}
+
+function DonationsTable({
+  title,
+  subtitle,
+  rows,
+  emptyMessage,
+  actingOn,
+  handleMatch,
+  selectedVolunteer,
+  setSelectedVolunteer,
+  handleAssignVolunteer,
+  availableVolunteers,
+}: DonationsTableProps) {
+  return (
+    <div className="mt-6">
+      <div className="mb-2 flex items-baseline gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">{title}</h2>
+        <span className="text-xs text-gray-400">
+          {subtitle} · {rows.length}
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+            <tr>
+              <th className="px-4 py-3">Donor</th>
+              <th className="px-4 py-3">Category</th>
+              <th className="px-4 py-3">Quantity</th>
+              <th className="px-4 py-3">Delivery</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((d) => (
+              <tr key={d.id}>
+                <td className="px-4 py-3">
+                  {d.donorName}
+                  {d.dropoffId && d.dropoffItemCount && d.dropoffItemCount > 1 && (
+                    <div className="text-xs text-gray-400">📦 1 of {d.dropoffItemCount}-item drop-off</div>
+                  )}
+                </td>
+                <td className="px-4 py-3 capitalize">{d.category}</td>
+                <td className="px-4 py-3">
+                  {d.quantity}
+                  {/* A donation can be matched more than once now — once it has
+                      leftover remainingQuantity, it stays "available" for a
+                      future match instead of a one-shot lifecycle (see
+                      "Donation leftover-quantity tracking" in CLAUDE.md).
+                      Only shown when it differs from the original amount, so
+                      a never-touched donation's row looks exactly as before. */}
+                  {typeof d.remainingQuantity === "number" &&
+                    typeof d.quantityValue === "number" &&
+                    d.remainingQuantity < d.quantityValue && (
+                      <span className="ml-1 text-xs text-gray-500">({d.remainingQuantity} left)</span>
+                    )}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500">
+                  {d.deliveryMethod === "self" ? "Self-delivery" : "Volunteer"}
+                </td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={d.status} />
+                </td>
+                <td className="px-4 py-3">
+                  {d.status === "available" && (
+                    <button
+                      disabled={actingOn === d.id}
+                      onClick={() => handleMatch(d.id)}
+                      className="rounded bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+                    >
+                      Find match
+                    </button>
+                  )}
+
+                  {d.status === "matched" && d.deliveryMethod === "self" && (
+                    <span className="text-xs font-medium text-green-700">Donor self-delivering ✓</span>
+                  )}
+
+                  {d.status === "matched" && d.deliveryMethod === "volunteer" && !d.assignedDeliveryId && (
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs text-amber-700">
+                        No auto-assign match (no available volunteer with a location set).
+                      </p>
+                      {d.lastRejectionReason !== undefined && d.lastRejectionReason !== null && (
+                        <p className="text-xs text-red-600">
+                          Previous volunteer rejected
+                          {d.lastRejectionReason ? `: "${d.lastRejectionReason}"` : " (no reason given)"}
+                        </p>
+                      )}
+                      {availableVolunteers.length === 0 ? (
+                        <p className="text-xs text-gray-400">No volunteers currently available.</p>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={selectedVolunteer[d.id] || ""}
+                            onChange={(e) =>
+                              setSelectedVolunteer((prev) => ({ ...prev, [d.id]: e.target.value }))
+                            }
+                            className="rounded border border-gray-300 px-2 py-1 text-xs"
+                          >
+                            <option value="">Select volunteer...</option>
+                            {availableVolunteers.map((v) => (
+                              <option key={v.uid} value={v.uid}>
+                                {v.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            disabled={actingOn === d.id}
+                            onClick={() => handleAssignVolunteer(d, false)}
+                            className="rounded bg-purple-600 px-3 py-1 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+                          >
+                            Assign
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {d.status === "matched" &&
+                    d.deliveryMethod === "volunteer" &&
+                    d.assignedDeliveryId &&
+                    d.deliveryStatus === "pending_acceptance" && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-gray-600">Awaiting volunteer response...</span>
+                        {availableVolunteers.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={selectedVolunteer[d.id] || ""}
+                              onChange={(e) =>
+                                setSelectedVolunteer((prev) => ({ ...prev, [d.id]: e.target.value }))
+                              }
+                              className="rounded border border-gray-300 px-2 py-1 text-xs"
+                            >
+                              <option value="">Reassign to...</option>
+                              {availableVolunteers.map((v) => (
+                                <option key={v.uid} value={v.uid}>
+                                  {v.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              disabled={actingOn === d.id}
+                              onClick={() => handleAssignVolunteer(d, true)}
+                              className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                            >
+                              Reassign
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  {d.status === "matched" &&
+                    d.deliveryMethod === "volunteer" &&
+                    d.assignedDeliveryId &&
+                    d.deliveryStatus !== "pending_acceptance" && (
+                      <span className="text-xs font-medium text-gray-600">Volunteer assigned ✓</span>
+                    )}
+
+                  {(d.status === "delivered" || (d.status !== "available" && d.status !== "matched")) && (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                  {emptyMessage}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 export default function AdminDonations() {
@@ -73,6 +278,15 @@ export default function AdminDonations() {
 
   const availableVolunteers = volunteers.filter((v) => v.available !== false);
 
+  const activeDonations = useMemo(
+    () => donations.filter((d) => ACTIVE_DONATION_STATUSES.has(d.status)),
+    [donations]
+  );
+  const doneDonations = useMemo(
+    () => donations.filter((d) => DONE_DONATION_STATUSES.has(d.status)),
+    [donations]
+  );
+
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "donations"), (snapshot) => {
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Donation);
@@ -90,7 +304,13 @@ export default function AdminDonations() {
       const base = `Matched to request ${result.matchedRequestId} (${result.distanceKm} km away).`;
       setMessage(
         result.autoAssignedVolunteer
-          ? `${base} Auto-assigned to ${result.autoAssignedVolunteer.name} (nearest available).`
+          ? `${base} Auto-assigned to ${result.autoAssignedVolunteer.name}${
+              result.autoAssignedVolunteer.sameDropoff
+                ? " (same volunteer already handling another item from this drop-off)."
+                : result.autoAssignedVolunteer.sameRequest
+                ? " (same volunteer already handling another item for this victim)."
+                : " (nearest available)."
+            }`
           : `${base}${
               result.deliveryId === null ? " No available volunteer with a location set — assign one manually below." : ""
             }`
@@ -187,156 +407,32 @@ export default function AdminDonations() {
       {loading ? (
         <p className="mt-4 text-sm text-gray-500">Loading...</p>
       ) : (
-        <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-4 py-3">Donor</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Quantity</th>
-                <th className="px-4 py-3">Delivery</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {donations.map((d) => (
-                <tr key={d.id}>
-                  <td className="px-4 py-3">{d.donorName}</td>
-                  <td className="px-4 py-3 capitalize">{d.category}</td>
-                  <td className="px-4 py-3">
-                    {d.quantity}
-                    {/* A donation can be matched more than once now — once it has
-                        leftover remainingQuantity, it stays "available" for a
-                        future match instead of a one-shot lifecycle (see
-                        "Donation leftover-quantity tracking" in CLAUDE.md).
-                        Only shown when it differs from the original amount, so
-                        a never-touched donation's row looks exactly as before. */}
-                    {typeof d.remainingQuantity === "number" &&
-                      typeof d.quantityValue === "number" &&
-                      d.remainingQuantity < d.quantityValue && (
-                        <span className="ml-1 text-xs text-gray-500">({d.remainingQuantity} left)</span>
-                      )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">
-                    {d.deliveryMethod === "self" ? "Self-delivery" : "Volunteer"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={d.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {d.status === "available" && (
-                      <button
-                        disabled={actingOn === d.id}
-                        onClick={() => handleMatch(d.id)}
-                        className="rounded bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50"
-                      >
-                        Find match
-                      </button>
-                    )}
-
-                    {d.status === "matched" && d.deliveryMethod === "self" && (
-                      <span className="text-xs font-medium text-green-700">Donor self-delivering ✓</span>
-                    )}
-
-                    {d.status === "matched" && d.deliveryMethod === "volunteer" && !d.assignedDeliveryId && (
-                      <div className="flex flex-col gap-1">
-                        <p className="text-xs text-amber-700">
-                          No auto-assign match (no available volunteer with a location set).
-                        </p>
-                        {d.lastRejectionReason !== undefined && d.lastRejectionReason !== null && (
-                          <p className="text-xs text-red-600">
-                            Previous volunteer rejected
-                            {d.lastRejectionReason ? `: "${d.lastRejectionReason}"` : " (no reason given)"}
-                          </p>
-                        )}
-                        {availableVolunteers.length === 0 ? (
-                          <p className="text-xs text-gray-400">No volunteers currently available.</p>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={selectedVolunteer[d.id] || ""}
-                              onChange={(e) =>
-                                setSelectedVolunteer((prev) => ({ ...prev, [d.id]: e.target.value }))
-                              }
-                              className="rounded border border-gray-300 px-2 py-1 text-xs"
-                            >
-                              <option value="">Select volunteer...</option>
-                              {availableVolunteers.map((v) => (
-                                <option key={v.uid} value={v.uid}>
-                                  {v.name}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              disabled={actingOn === d.id}
-                              onClick={() => handleAssignVolunteer(d, false)}
-                              className="rounded bg-purple-600 px-3 py-1 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-                            >
-                              Assign
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {d.status === "matched" &&
-                      d.deliveryMethod === "volunteer" &&
-                      d.assignedDeliveryId &&
-                      d.deliveryStatus === "pending_acceptance" && (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-gray-600">Awaiting volunteer response...</span>
-                          {availableVolunteers.length > 0 && (
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={selectedVolunteer[d.id] || ""}
-                                onChange={(e) =>
-                                  setSelectedVolunteer((prev) => ({ ...prev, [d.id]: e.target.value }))
-                                }
-                                className="rounded border border-gray-300 px-2 py-1 text-xs"
-                              >
-                                <option value="">Reassign to...</option>
-                                {availableVolunteers.map((v) => (
-                                  <option key={v.uid} value={v.uid}>
-                                    {v.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                disabled={actingOn === d.id}
-                                onClick={() => handleAssignVolunteer(d, true)}
-                                className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                              >
-                                Reassign
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                    {d.status === "matched" &&
-                      d.deliveryMethod === "volunteer" &&
-                      d.assignedDeliveryId &&
-                      d.deliveryStatus !== "pending_acceptance" && (
-                        <span className="text-xs font-medium text-gray-600">Volunteer assigned ✓</span>
-                      )}
-
-                    {(d.status === "delivered" || (d.status !== "available" && d.status !== "matched")) && (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {donations.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
-                    No donations yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <DonationsTable
+            title="Active"
+            subtitle="Available or matched"
+            rows={activeDonations}
+            emptyMessage={donations.length === 0 ? "No donations yet." : "No active donations."}
+            actingOn={actingOn}
+            handleMatch={handleMatch}
+            selectedVolunteer={selectedVolunteer}
+            setSelectedVolunteer={setSelectedVolunteer}
+            handleAssignVolunteer={handleAssignVolunteer}
+            availableVolunteers={availableVolunteers}
+          />
+          <DonationsTable
+            title="Done"
+            subtitle="Delivered successfully"
+            rows={doneDonations}
+            emptyMessage="No delivered donations yet."
+            actingOn={actingOn}
+            handleMatch={handleMatch}
+            selectedVolunteer={selectedVolunteer}
+            setSelectedVolunteer={setSelectedVolunteer}
+            handleAssignVolunteer={handleAssignVolunteer}
+            availableVolunteers={availableVolunteers}
+          />
+        </>
       )}
 
       {volunteers.length === 0 && !loading && (

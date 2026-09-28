@@ -62,7 +62,12 @@ function describeEntry(entry: AuditEntry) {
       return `Donation ${entry.targetId} (${entry.details.category}) → request ${entry.details.matchedRequestId}`;
     case "delivery.assign": {
       const who = entry.details.volunteerName || entry.details.volunteerId;
-      const source = entry.details.source === "auto" ? " (auto-assigned, nearest available)" : "";
+      const sourceLabel: Record<string, string> = {
+        auto: " (auto-assigned, nearest available)",
+        auto_dropoff: " (auto-assigned, same drop-off)",
+        auto_request: " (auto-assigned, same victim's other item)",
+      };
+      const source = sourceLabel[entry.details.source as string] || "";
       return `Volunteer ${who} → request ${entry.details.requestId}${source}`;
     }
     case "delivery.reassign":

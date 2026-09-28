@@ -17,6 +17,10 @@ import type { VolunteerTabParamList } from "../../navigation/types";
 // delivery is actually linked (at accept) and stays viewable (read-only
 // once locked) through the rest of the delivery.
 const CHATTABLE_STATUSES = new Set(["accepted", "picked_up", "delivered", "confirmed"]);
+// Same as web's NAVIGABLE_STATUSES — only while there's a real "go
+// somewhere" destination (pending_acceptance has nothing yet, delivered/
+// confirmed are already done).
+const NAVIGABLE_STATUSES = new Set(["accepted", "picked_up"]);
 
 interface Delivery {
   id: string;
@@ -28,6 +32,12 @@ interface Delivery {
   createdAt: string;
   confirmToken?: string;
   handoffVersion?: number;
+  // Set when this delivery's donation was part of a multi-category drop-off
+  // (see "Donation batching" in CLAUDE.md) — lets the volunteer see at a
+  // glance that several of their own deliveries came from the same donor
+  // visit, rather than reading as unrelated separate assignments.
+  dropoffId?: string | null;
+  donorName?: string;
 }
 
 interface FellowTraveller {
@@ -36,6 +46,10 @@ interface FellowTraveller {
   originDistrict: string | null;
   destinationDistrict: string | null;
   status: string;
+  sameDropoff?: boolean;
+  // Same victim's other item, fulfilled by a different, unrelated donor (no
+  // shared dropoffId) — see "Fellow travellers" in CLAUDE.md.
+  sameRequest?: boolean;
 }
 
 interface HandoffRequest {
@@ -148,6 +162,31 @@ export function MyDeliveriesScreen() {
       unsubReceived();
     };
   }, [profile?.uid]);
+
+  // How many of the volunteer's OWN deliveries share each non-null
+  // dropoffId — only worth a badge once that's more than 1. Same reasoning
+  // as web's VolunteerDeliveries.tsx: a sibling item assigned to a
+  // *different* volunteer shows up via the Fellow Travellers panel instead
+  // (sameDropoff), not here.
+  const dropoffSiblingCount = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of deliveries) {
+      if (!d.dropoffId) continue;
+      counts[d.dropoffId] = (counts[d.dropoffId] || 0) + 1;
+    }
+    return counts;
+  }, [deliveries]);
+
+  // Same idea, keyed by requestId instead — how many of the volunteer's OWN
+  // deliveries fulfill the same victim's request, whether or not those
+  // items came from the same donor.
+  const requestSiblingCount = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of deliveries) {
+      counts[d.requestId] = (counts[d.requestId] || 0) + 1;
+    }
+    return counts;
+  }, [deliveries]);
 
   const incomingHandoffs = useMemo(
     () => handoffs.filter((h) => h.toVolunteerId === profile?.uid && h.status === "pending"),
@@ -357,6 +396,20 @@ export function MyDeliveriesScreen() {
                           donationId: d.donationId.slice(0, 6),
                         })}
                       </Text>
+                      {d.dropoffId && dropoffSiblingCount[d.dropoffId] > 1 && (
+                        <Text className="text-xs text-orange-700">
+                          📦{" "}
+                          {t("volunteerDeliveries.dropoffBadge", {
+                            count: dropoffSiblingCount[d.dropoffId],
+                            donorName: d.donorName || "",
+                          })}
+                        </Text>
+                      )}
+                      {requestSiblingCount[d.requestId] > 1 && (
+                        <Text className="text-xs text-blue-700">
+                          🏠 {t("volunteerDeliveries.sameVictimBadge", { count: requestSiblingCount[d.requestId] })}
+                        </Text>
+                      )}
                     </View>
                     <StatusBadge status={d.status} />
                   </View>
@@ -389,6 +442,15 @@ export function MyDeliveriesScreen() {
                           <Text className="text-xs font-medium text-gray-700">💬 {t("volunteerDeliveries.chatVictim")}</Text>
                         </TouchableOpacity>
                       </>
+                    )}
+                    {NAVIGABLE_STATUSES.has(d.status) && (
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate("VolunteerNavigation", { deliveryId: d.id })}
+                        accessibilityRole="button"
+                        className="rounded border border-gray-300 bg-white px-3 py-1.5"
+                      >
+                        <Text className="text-xs font-medium text-gray-700">🧭 {t("volunteerDeliveries.navigate")}</Text>
+                      </TouchableOpacity>
                     )}
                     {d.status === "pending_acceptance" && (
                       <>
@@ -496,9 +558,25 @@ export function MyDeliveriesScreen() {
                             {fellowTravellers[d.id].map((ft) => (
                               <View
                                 key={ft.deliveryId}
-                                className="rounded border border-gray-100 bg-gray-50 px-2.5 py-1.5"
+                                className={`rounded border px-2.5 py-1.5 ${
+                                  ft.sameDropoff
+                                    ? "border-orange-200 bg-orange-50"
+                                    : ft.sameRequest
+                                    ? "border-blue-200 bg-blue-50"
+                                    : "border-gray-100 bg-gray-50"
+                                }`}
                               >
                                 <Text className="text-xs text-gray-700">
+                                  {ft.sameDropoff && (
+                                    <Text className="font-medium text-orange-700">
+                                      📦 {t("volunteerDeliveries.sameDropoffBadge")}{" "}
+                                    </Text>
+                                  )}
+                                  {!ft.sameDropoff && ft.sameRequest && (
+                                    <Text className="font-medium text-blue-700">
+                                      🏠 {t("volunteerDeliveries.sameRequestBadge")}{" "}
+                                    </Text>
+                                  )}
                                   {t(`categories.${ft.category}`, { defaultValue: ft.category })} ·{" "}
                                   {ft.originDistrict || "?"} → {ft.destinationDistrict || "?"}
                                 </Text>

@@ -48,6 +48,12 @@ export function SubmitRequestScreen() {
   const categoryKeys = Object.keys(categoryLimits);
   const detectedDistrict = location ? nearestDistrict(location) : null;
   const districtIsActive = detectedDistrict ? activeDistrictNames.has(detectedDistrict) : false;
+  // Medicine has no meaningful quantity/capacity (max: null server-side) —
+  // the real need is described in free text, so notes become required
+  // instead of showing a quantity field for this one category. Mirrors the
+  // identical change on web's VictimRequestForm.tsx.
+  const medicineSelected = "medicine" in quantities;
+  const clothingSelected = "clothing" in quantities;
 
   async function captureLocation() {
     setLocationStatus("capturing");
@@ -96,6 +102,15 @@ export function SubmitRequestScreen() {
     const items = Object.entries(quantities).map(([category, quantity]) => ({ category, quantity }));
     if (items.length === 0) {
       setError(t("victimRequestForm.selectAtLeastOne", "Select at least one item you need."));
+      return;
+    }
+    if (medicineSelected && !notes.trim()) {
+      setError(
+        t(
+          "victimRequestForm.medicineNotesRequired",
+          "Please describe the medicine you need in the notes field (name, dosage, or condition it's for)."
+        )
+      );
       return;
     }
     setSubmitting(true);
@@ -182,13 +197,15 @@ export function SubmitRequestScreen() {
                       <Text className="flex-1 text-sm text-gray-700">
                         {t(`categories.${category}`, limit.label)}{" "}
                         <Text className="text-xs text-gray-400">
-                          {limit.max === null
-                            ? `(${limit.unit}, ${t("victimRequestForm.noFixedCap")})`
-                            : `(${t("victimRequestForm.upTo")} ${limit.max} ${limit.unit})`}
+                          {category === "medicine"
+                            ? `(${t("victimRequestForm.describeInNotes", "describe in notes below")})`
+                            : limit.max === null
+                              ? `(${limit.unit}, ${t("victimRequestForm.noFixedCap")})`
+                              : `(${t("victimRequestForm.upTo")} ${limit.max} ${limit.unit})`}
                         </Text>
                       </Text>
                     </TouchableOpacity>
-                    {selected && (
+                    {selected && category !== "medicine" && (
                       <TextInput
                         keyboardType="number-pad"
                         value={String(quantities[category])}
@@ -263,7 +280,25 @@ export function SubmitRequestScreen() {
         </View>
 
         <View>
-          <Text className="mb-1 text-sm font-medium text-gray-700">{t("victimRequestForm.notes")}</Text>
+          <Text className="mb-1 text-sm font-medium text-gray-700">
+            {medicineSelected ? t("victimRequestForm.notesRequiredForMedicine", "Additional notes") + " *" : t("victimRequestForm.notes")}
+          </Text>
+          {medicineSelected && (
+            <Text className="mb-1 text-xs text-gray-500">
+              {t(
+                "victimRequestForm.medicineNotesHint",
+                "Required — please describe the medicine needed (name, dosage, or condition it's for)."
+              )}
+            </Text>
+          )}
+          {clothingSelected && (
+            <Text className="mb-1 text-xs text-gray-500">
+              {t(
+                "victimRequestForm.clothingNotesHint",
+                "Optional — it helps to mention how many male/female and approximate clothing sizes."
+              )}
+            </Text>
+          )}
           <TextInput
             value={notes}
             onChangeText={setNotes}

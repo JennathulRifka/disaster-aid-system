@@ -18,11 +18,12 @@ export function RegisterDonationScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<DonorTabParamList>>();
   const [categories, setCategories] = useState<Record<string, CategoryLimit>>({});
   const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [items, setItems] = useState<Record<string, string>>({});
-  // Free-text `items` above stays the display label ("50 kg rice") —
-  // unchanged. `itemAmounts` is the new real-number field the
-  // district-inventory feature needs (see "Donation leftover-quantity
-  // tracking" in CLAUDE.md).
+  // A single numeric quantity per category — matches SubmitRequestScreen.tsx's
+  // picker exactly (checkbox + one number box), replacing the earlier
+  // two-box layout (a free-text "50 kg rice" field alongside a separate
+  // numeric one) that read as confusingly duplicated. The unit still needed
+  // for the display string (e.g. "50 kg") comes from the category's own
+  // `unit` field, same as the hint text shown next to each checkbox.
   const [itemAmounts, setItemAmounts] = useState<Record<string, string>>({});
   const [deliveryMethod, setDeliveryMethod] = useState<"self" | "volunteer">("volunteer");
   const [notes, setNotes] = useState("");
@@ -40,25 +41,12 @@ export function RegisterDonationScreen() {
   const categoryKeys = Object.keys(categories);
 
   function toggleCategory(category: string) {
-    setItems((prev) => {
-      const next = { ...prev };
-      if (category in next) {
-        delete next[category];
-      } else {
-        next[category] = "";
-      }
-      return next;
-    });
     setItemAmounts((prev) => {
       const next = { ...prev };
       if (category in next) delete next[category];
       else next[category] = "";
       return next;
     });
-  }
-
-  function setItemQuantity(category: string, value: string) {
-    setItems((prev) => ({ ...prev, [category]: value }));
   }
 
   function setItemAmount(category: string, value: string) {
@@ -87,13 +75,9 @@ export function RegisterDonationScreen() {
       setError(t("donorDonationForm.errorNoLocation"));
       return;
     }
-    const selectedCategories = Object.keys(items);
+    const selectedCategories = Object.keys(itemAmounts);
     if (selectedCategories.length === 0) {
       setError(t("donorDonationForm.selectAtLeastOne"));
-      return;
-    }
-    if (selectedCategories.some((category) => !items[category].trim())) {
-      setError(t("donorDonationForm.errorNoQuantity"));
       return;
     }
     if (selectedCategories.some((category) => !(Number(itemAmounts[category]) > 0))) {
@@ -102,49 +86,31 @@ export function RegisterDonationScreen() {
     }
     setSubmitting(true);
     try {
-      // One donation per selected category, sharing the same pickup
-      // location/delivery method/notes — matches web's DonorDonationForm.tsx
-      // and the app's existing single-category-per-donation data model.
-      const results = await Promise.allSettled(
-        selectedCategories.map((category) =>
-          apiFetch("/api/donations", {
-            method: "POST",
-            body: JSON.stringify({
-              category,
-              quantity: items[category].trim(),
-              quantityValue: Number(itemAmounts[category]),
-              location,
-              deliveryMethod,
-              notes,
-            }),
-          })
-        )
-      );
-      const anyFailed = results.some((r) => r.status === "rejected");
-      if (anyFailed && results.every((r) => r.status === "rejected")) {
-        throw (results[0] as PromiseRejectedResult).reason;
-      }
-      if (anyFailed) {
-        // Keep only the categories that actually failed, so the donor can
-        // retry just those instead of re-entering everything.
-        const failedCategories = new Set(
-          selectedCategories.filter((_, i) => results[i].status === "rejected")
-        );
-        setItems((prev) =>
-          Object.fromEntries(Object.entries(prev).filter(([category]) => failedCategories.has(category)))
-        );
-        setItemAmounts((prev) =>
-          Object.fromEntries(Object.entries(prev).filter(([category]) => failedCategories.has(category)))
-        );
-        setError(t("donorDonationForm.errorPartial"));
-      } else {
-        setItems({});
-        setItemAmounts({});
-        setNotes("");
-        setLocation(null);
-        setLocationStatus("idle");
-        navigation.navigate("MyDonations");
-      }
+      // One donation document per selected category still (donations have
+      // always been single-category documents throughout this app — see
+      // "Multi-category donations" in CLAUDE.md), but now created together
+      // in one atomic POST /batch call rather than N separate POSTs — see
+      // "Donation batching" in CLAUDE.md for why (keeping a multi-category
+      // drop-off linked so it doesn't fragment across volunteers who don't
+      // know they're related).
+      await apiFetch("/api/donations/batch", {
+        method: "POST",
+        body: JSON.stringify({
+          items: selectedCategories.map((category) => ({
+            category,
+            quantity: `${itemAmounts[category]} ${categories[category].unit}`,
+            quantityValue: Number(itemAmounts[category]),
+          })),
+          location,
+          deliveryMethod,
+          notes,
+        }),
+      });
+      setItemAmounts({});
+      setNotes("");
+      setLocation(null);
+      setLocationStatus("idle");
+      navigation.navigate("MyDonations");
     } catch (err: any) {
       setError(err.message || t("donorDonationForm.errorGeneric"));
     } finally {
@@ -167,7 +133,7 @@ export function RegisterDonationScreen() {
             <View style={{ gap: 8 }}>
               {categoryKeys.map((category) => {
                 const c = categories[category];
-                const selected = category in items;
+                const selected = category in itemAmounts;
                 return (
                   <View
                     key={category}
@@ -188,26 +154,17 @@ export function RegisterDonationScreen() {
                         {selected && <Text className="text-xs font-bold text-white">✓</Text>}
                       </View>
                       <Text className="flex-1 text-sm text-gray-700">
-                        {t(`categories.${category}`, { defaultValue: c.label })}
+                        {t(`categories.${category}`, { defaultValue: c.label })}{" "}
+                        <Text className="text-xs text-gray-400">({c.unit})</Text>
                       </Text>
                     </TouchableOpacity>
                     {selected && (
-                      <View className="flex-row" style={{ gap: 6 }}>
-                        <TextInput
-                          value={items[category]}
-                          onChangeText={(v) => setItemQuantity(category, v)}
-                          placeholder={t("donorDonationForm.quantityPlaceholder")}
-                          className="w-24 rounded border border-gray-300 px-2 py-1 text-sm"
-                        />
-                        <TextInput
-                          value={itemAmounts[category] ?? ""}
-                          onChangeText={(v) => setItemAmount(category, v)}
-                          placeholder={t("donorDonationForm.amountPlaceholder")}
-                          keyboardType="numeric"
-                          accessibilityLabel={t("donorDonationForm.amountPlaceholder")}
-                          className="w-16 rounded border border-gray-300 px-2 py-1 text-sm"
-                        />
-                      </View>
+                      <TextInput
+                        value={itemAmounts[category] ?? ""}
+                        onChangeText={(v) => setItemAmount(category, v)}
+                        keyboardType="numeric"
+                        className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm"
+                      />
                     )}
                   </View>
                 );

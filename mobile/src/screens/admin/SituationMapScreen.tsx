@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, AccessibilityInfo } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, AccessibilityInfo, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { collection, onSnapshot } from "firebase/firestore";
 import MapView, { Marker, Geojson, PROVIDER_GOOGLE } from "react-native-maps";
 import { db } from "../../lib/firebase";
@@ -52,12 +53,15 @@ interface GaugeStation {
 interface Reservoir {
   name: string;
   size: "major" | "medium" | "hydropower";
+  source: "irrigation_department" | "ceb_mahaweli";
   lat?: number | null;
   lng?: number | null;
   locationApproximate?: boolean;
   district: string | null;
   effectiveStoragePercent: number | null;
   levelMsl?: number | null;
+  rainfallMm?: number | null;
+  date?: string | null;
   riskLevel: "normal" | "elevated" | "high" | "spilling";
 }
 
@@ -146,6 +150,47 @@ const RESERVOIR_RISK_LABEL: Record<string, string> = {
   high: "Near capacity",
   spilling: "Spilling",
 };
+const RESERVOIR_RISK_BADGE_CLASS: Record<string, string> = {
+  normal: "bg-gray-100",
+  elevated: "bg-amber-100",
+  high: "bg-orange-100",
+  spilling: "bg-red-100",
+};
+const RESERVOIR_RISK_TEXT_CLASS: Record<string, string> = {
+  normal: "text-gray-700",
+  elevated: "text-amber-800",
+  high: "text-orange-800",
+  spilling: "text-red-800",
+};
+
+// Shared between the Irrigation Department and CEB Mahaweli sub-lists below
+// — same card layout as the public SeverityMapScreen.tsx's ReservoirCard,
+// but every risk level gets a badge (including "normal"), matching web's
+// admin ReservoirListItem exactly — this is the technical/complete view,
+// unlike the public list's "only show a badge when something's actually
+// wrong" treatment.
+function ReservoirCard({ r }: { r: Reservoir }) {
+  return (
+    <View className="rounded border border-gray-200 bg-white p-3">
+      <View className="flex-row flex-wrap items-center" style={{ gap: 6 }}>
+        <View className={`rounded-full px-2 py-0.5 ${RESERVOIR_RISK_BADGE_CLASS[r.riskLevel]}`}>
+          <Text className={`text-xs font-medium ${RESERVOIR_RISK_TEXT_CLASS[r.riskLevel]}`}>
+            {RESERVOIR_RISK_LABEL[r.riskLevel]}
+          </Text>
+        </View>
+        <Text className="text-sm font-medium text-gray-900">{r.name}</Text>
+        <Text className="text-xs text-gray-400">({r.size})</Text>
+        {r.district && <Text className="text-sm text-gray-500">→ {r.district} district</Text>}
+      </View>
+      <Text className="mt-1 text-sm text-gray-600">
+        {r.effectiveStoragePercent != null ? `${r.effectiveStoragePercent}% capacity` : "Capacity unknown"}
+        {r.levelMsl != null ? ` · ${r.levelMsl} m MSL` : ""}
+        {r.rainfallMm != null && r.rainfallMm > 0 ? ` · ${r.rainfallMm}mm rain (preceding day)` : ""}
+      </Text>
+      {r.date && <Text className="mt-1 text-xs text-gray-400">As of {r.date}</Text>}
+    </View>
+  );
+}
 const GDACS_ALERT_COLOR: Record<string, string> = {
   Green: "#16a34a",
   Orange: "#f97316",
@@ -257,6 +302,13 @@ export function SituationMapScreen() {
   const [boundariesLoaded, setBoundariesLoaded] = useState(false);
   const [gdacsScope, setGdacsScope] = useState<"sri-lanka" | "global">("sri-lanka");
   const [earthquakeScope, setEarthquakeScope] = useState<"sri-lanka" | "regional">("sri-lanka");
+  // Two-level disclosure for the Irrigation Dept sub-list (109 reservoirs is
+  // a lot of scroll for most admins) — matches web's admin SituationMap.tsx
+  // exactly: collapsed behind "View reservoirs" first, then a nested "Show
+  // all N" toggle once opened (defaults to flagged-only). The Hydropower
+  // sub-list (only 3) has no equivalent toggle, same as web.
+  const [showIrrigationReservoirs, setShowIrrigationReservoirs] = useState(false);
+  const [showAllReservoirs, setShowAllReservoirs] = useState(false);
   // Persists across tab switches within the 5 local tabs, deliberately — the
   // same low-effort consequence web's own district search has (search
   // Ratnapura on Requests, switch to Reservoirs, still zoomed to Ratnapura).
@@ -413,7 +465,14 @@ export function SituationMapScreen() {
   }, [viewMode]);
 
   return (
-    <View className="flex-1 bg-gray-50 p-4">
+    // Whole-screen ScrollView + a fixed-height map, not flex-1 — the same
+    // pattern SeverityMapScreen.tsx/AreaSeverityMap.tsx already use
+    // successfully. This is a *vertical* page-scroll change, unrelated to
+    // the tab row's own documented horizontal-ScrollView history just below
+    // (that was a different, already-abandoned approach for a different
+    // element). Needed so the reservoir list panel has somewhere to render
+    // without being squeezed into whatever space a flex-1 map didn't take.
+    <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16 }}>
       <Text className="text-2xl font-semibold text-gray-900">Situation Map</Text>
 
       {/* Two attempts at a horizontal-ScrollView-based tab row (a nested
@@ -488,11 +547,11 @@ export function SituationMapScreen() {
       </View>
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <View style={{ height: 420, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator size="large" color="#ea580c" />
         </View>
       ) : (
-        <View className="mt-3 flex-1" style={{ borderRadius: 12, overflow: "hidden" }}>
+        <View className="mt-3" style={{ height: 420, borderRadius: 12, overflow: "hidden" }}>
           <MapView ref={mapRef} provider={PROVIDER_GOOGLE} style={{ flex: 1 }} initialRegion={SRI_LANKA_REGION}>
             {/* Deliberately no <Callout> anywhere here — react-native-maps'
                 native Callout on Android renders its JS content into a
@@ -752,6 +811,83 @@ export function SituationMapScreen() {
       {viewMode === "earthquakes" && earthquakes.length === 0 && (
         <Text className="mt-3 text-sm text-gray-500">No active events</Text>
       )}
-    </View>
+
+      {viewMode === "reservoirs" &&
+        (() => {
+          const irrigation = reservoirs.filter((r) => r.source === "irrigation_department");
+          const flagged = irrigation.filter((r) => r.riskLevel !== "normal");
+          const visibleIrrigation = showAllReservoirs ? irrigation : flagged;
+          const hydro = reservoirs.filter((r) => r.source === "ceb_mahaweli");
+          return (
+            <View className="mt-6 rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+              <Text className="text-sm font-semibold text-gray-900">Reservoir Storage Levels</Text>
+
+              <View className="mt-4">
+                <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Irrigation Department Major & Medium Reservoirs
+                </Text>
+                <Text className="mt-1 text-xs text-gray-400">
+                  Daily storage % and spilling status for {irrigation.length} irrigation reservoirs, from the
+                  Irrigation Department's own published bulletin.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowIrrigationReservoirs((v) => !v)}
+                  accessibilityRole="button"
+                  className="mt-2 flex-row items-center"
+                  style={{ gap: 4 }}
+                >
+                  <Ionicons name={showIrrigationReservoirs ? "chevron-up" : "chevron-down"} size={12} color="#c2410c" />
+                  <Text className="text-xs font-medium text-orange-700">
+                    {showIrrigationReservoirs ? "Hide reservoirs" : "View reservoirs"}
+                  </Text>
+                </TouchableOpacity>
+                {showIrrigationReservoirs && (
+                  <>
+                    <TouchableOpacity
+                      onPress={() => setShowAllReservoirs((v) => !v)}
+                      accessibilityRole="button"
+                      className="mt-2 flex-row items-center"
+                      style={{ gap: 4 }}
+                    >
+                      <Ionicons name={showAllReservoirs ? "chevron-up" : "chevron-down"} size={12} color="#c2410c" />
+                      <Text className="text-xs font-medium text-orange-700">
+                        {showAllReservoirs
+                          ? "Show less (elevated/near-capacity/spilling only)"
+                          : `Show all ${irrigation.length} reservoirs`}
+                      </Text>
+                    </TouchableOpacity>
+                    {visibleIrrigation.length === 0 ? (
+                      <Text className="mt-2 text-sm text-gray-500">
+                        {flagged.length === 0 ? "No reservoirs currently at elevated storage." : "No reservoirs to show."}
+                      </Text>
+                    ) : (
+                      <View className="mt-2" style={{ gap: 8 }}>
+                        {visibleIrrigation.map((r) => (
+                          <ReservoirCard key={r.name} r={r} />
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
+
+              <View className="mt-6">
+                <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Hydropower & Mahaweli Reservoirs
+                </Text>
+                {hydro.length === 0 ? (
+                  <Text className="mt-2 text-sm text-gray-500">Hydropower reservoir data is temporarily unavailable.</Text>
+                ) : (
+                  <View className="mt-2" style={{ gap: 8 }}>
+                    {hydro.map((r) => (
+                      <ReservoirCard key={r.name} r={r} />
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        })()}
+    </ScrollView>
   );
 }

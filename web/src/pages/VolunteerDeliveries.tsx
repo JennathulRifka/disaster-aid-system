@@ -26,6 +26,12 @@ interface Delivery {
   createdAt: string;
   confirmToken?: string;
   handoffVersion?: number;
+  // Set when this delivery's donation was part of a multi-category drop-off
+  // (see "Donation batching" in CLAUDE.md) — lets the volunteer see at a
+  // glance that several of their own deliveries came from the same donor
+  // visit, rather than reading as unrelated separate assignments.
+  dropoffId?: string | null;
+  donorName?: string;
 }
 
 interface HandoffRequest {
@@ -45,6 +51,12 @@ interface FellowTraveller {
   originDistrict: string | null;
   destinationDistrict: string | null;
   status: string;
+  sameDropoff?: boolean;
+  // Set when this candidate fulfills a DIFFERENT category on the exact same
+  // aid request as the delivery being viewed — i.e. the same victim, just
+  // via a different, unrelated donor (no shared dropoffId). See "Fellow
+  // travellers" in CLAUDE.md.
+  sameRequest?: boolean;
 }
 
 // A delivery is worth showing fellow-traveller matches for once the
@@ -126,6 +138,33 @@ export default function VolunteerDeliveries() {
       unsubReceived();
     };
   }, [profile?.uid]);
+
+  // How many of the volunteer's OWN deliveries share each non-null
+  // dropoffId — only worth a badge once that's more than 1. This can only
+  // ever reflect deliveries already assigned to this volunteer; a sibling
+  // item that went to a *different* volunteer shows up via the Fellow
+  // Travellers panel below instead (sameDropoff), not here.
+  const dropoffSiblingCount = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of deliveries) {
+      if (!d.dropoffId) continue;
+      counts[d.dropoffId] = (counts[d.dropoffId] || 0) + 1;
+    }
+    return counts;
+  }, [deliveries]);
+
+  // Same idea as dropoffSiblingCount, keyed by requestId instead — how many
+  // of the volunteer's OWN deliveries fulfill the same victim's request
+  // (whether or not those items came from the same donor). A sibling item
+  // assigned to a *different* volunteer shows up via the Fellow Travellers
+  // panel below instead (sameRequest), not here.
+  const requestSiblingCount = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of deliveries) {
+      counts[d.requestId] = (counts[d.requestId] || 0) + 1;
+    }
+    return counts;
+  }, [deliveries]);
 
   const incomingHandoffs = useMemo(
     () => handoffs.filter((h) => h.toVolunteerId === profile?.uid && h.status === "pending"),
@@ -373,6 +412,19 @@ export default function VolunteerDeliveries() {
                       donationId: d.donationId.slice(0, 6),
                     })}
                   </p>
+                  {d.dropoffId && dropoffSiblingCount[d.dropoffId] > 1 && (
+                    <p className="text-xs text-orange-700">
+                      📦 {t("volunteerDeliveries.dropoffBadge", {
+                        count: dropoffSiblingCount[d.dropoffId],
+                        donorName: d.donorName || "",
+                      })}
+                    </p>
+                  )}
+                  {requestSiblingCount[d.requestId] > 1 && (
+                    <p className="text-xs text-blue-700">
+                      🏠 {t("volunteerDeliveries.sameVictimBadge", { count: requestSiblingCount[d.requestId] })}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusBadge status={d.status} />
@@ -489,9 +541,25 @@ export default function VolunteerDeliveries() {
                         {fellowTravellers[d.id].map((ft) => (
                           <li
                             key={ft.deliveryId}
-                            className="flex items-center justify-between rounded border border-gray-100 bg-gray-50 px-2.5 py-1.5 text-xs"
+                            className={`flex items-center justify-between rounded border px-2.5 py-1.5 text-xs ${
+                              ft.sameDropoff
+                                ? "border-orange-200 bg-orange-50"
+                                : ft.sameRequest
+                                ? "border-blue-200 bg-blue-50"
+                                : "border-gray-100 bg-gray-50"
+                            }`}
                           >
                             <span className="text-gray-700">
+                              {ft.sameDropoff && (
+                                <span className="mr-1 font-medium text-orange-700">
+                                  📦 {t("volunteerDeliveries.sameDropoffBadge")}
+                                </span>
+                              )}
+                              {!ft.sameDropoff && ft.sameRequest && (
+                                <span className="mr-1 font-medium text-blue-700">
+                                  🏠 {t("volunteerDeliveries.sameRequestBadge")}
+                                </span>
+                              )}
                               {t(`categories.${ft.category}`, ft.category)} · {ft.originDistrict || "?"} →{" "}
                               {ft.destinationDistrict || "?"}
                             </span>

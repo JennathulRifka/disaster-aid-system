@@ -135,6 +135,8 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
       method: "volunteer",
       status: "pending_acceptance", // pending_acceptance -> accepted | rejected -> picked_up -> delivered -> confirmed
       currentLocation: null,
+      dropoffId: donation.dropoffId || null,
+      donorName: donation.donorName,
       createdAt: now,
       updatedAt: now,
     };
@@ -517,6 +519,7 @@ router.get("/:id/fellow-travellers", requireAuth, requireRole("volunteer"), asyn
     ]);
     if (!donationDoc.exists || !requestDoc.exists) return res.json([]);
     const myOrigin = donationDoc.data().district || nearestDistrict(donationDoc.data().location);
+    const myDropoffId = donationDoc.data().dropoffId || null;
     const myDestination = nearestDistrict(requestDoc.data().location);
     if (!myDestination) return res.json([]);
 
@@ -535,9 +538,25 @@ router.get("/:id/fellow-travellers", requireAuth, requireRole("volunteer"), asyn
       ]);
       if (!cDonationDoc.exists || !cRequestDoc.exists) continue;
       const cDestination = nearestDistrict(cRequestDoc.data().location);
-      if (!cDestination || cDestination !== myDestination) continue;
       const cOrigin = cDonationDoc.data().district || nearestDistrict(cDonationDoc.data().location);
-      if (sameOriginOnly && cOrigin !== myOrigin) continue;
+      // A sibling from the SAME physical drop-off (dropoffId) is always
+      // surfaced, regardless of where its own item is headed — the whole
+      // point is "you're literally collecting from the same place as this
+      // other volunteer," which matters even when the two items serve
+      // different victims in different districts. Same idea for a sibling
+      // fulfilling the SAME request (same victim, different donor) — it
+      // always shares a destination by definition (same victim's own
+      // location), so it would already pass the destination check below,
+      // but it's flagged separately so the UI can say "same victim," not
+      // just "happens to share a district." Everything else still needs a
+      // genuine destination (and, if requested, origin) match — see
+      // "Donation batching" / "Fellow travellers" in CLAUDE.md.
+      const sameDropoff = Boolean(myDropoffId) && cDonationDoc.data().dropoffId === myDropoffId;
+      const sameRequest = candidate.requestId === delivery.requestId;
+      if (!sameDropoff && !sameRequest) {
+        if (!cDestination || cDestination !== myDestination) continue;
+        if (sameOriginOnly && cOrigin !== myOrigin) continue;
+      }
 
       results.push({
         deliveryId: candidate.id,
@@ -545,15 +564,38 @@ router.get("/:id/fellow-travellers", requireAuth, requireRole("volunteer"), asyn
         originDistrict: cOrigin,
         destinationDistrict: cDestination,
         status: candidate.status,
+        sameDropoff,
+        sameRequest,
       });
     }
 
+    // Same-dropoff siblings surface first (the strongest, most actionable
+    // match — "you're both collecting from the same place right now"),
+    // then same-request siblings ("this is the same victim's other item"),
+    // ahead of ordinary destination-only matches.
+    results.sort((a, b) => Number(b.sameDropoff) - Number(a.sameDropoff) || Number(b.sameRequest) - Number(a.sameRequest));
     return res.json(results);
   } catch (err) {
     console.error("Fellow travellers lookup error:", err.message);
     return res.status(500).json({ error: "Failed to look up fellow travellers.", details: err.message });
   }
 });
+
+/** True when both deliveries' donations share the same non-null dropoffId —
+ * i.e. they're literally the same physical drop-off, regardless of where
+ * each item is headed. Used to relax the "same destination district"
+ * requirement on the chat-start and handoff routes below, mirroring the
+ * same bypass GET /:id/fellow-travellers already applies when listing
+ * candidates (see "Donation batching" in CLAUDE.md). */
+async function deliveriesShareDropoff(delivery, other) {
+  const [donationDoc, otherDonationDoc] = await Promise.all([
+    db.collection("donations").doc(delivery.donationId).get(),
+    db.collection("donations").doc(other.donationId).get(),
+  ]);
+  const dropoffId = donationDoc.exists ? donationDoc.data().dropoffId : null;
+  const otherDropoffId = otherDonationDoc.exists ? otherDonationDoc.data().dropoffId : null;
+  return Boolean(dropoffId) && dropoffId === otherDropoffId;
+}
 
 /**
  * POST /api/deliveries/:id/fellow-travellers/:otherId/chat
@@ -583,17 +625,19 @@ router.post("/:id/fellow-travellers/:otherId/chat", requireAuth, requireRole("vo
       return res.status(400).json({ error: "Both deliveries must be currently active (accepted or picked up)." });
     }
 
-    const [requestDoc, otherRequestDoc] = await Promise.all([
-      db.collection("aidRequests").doc(delivery.requestId).get(),
-      db.collection("aidRequests").doc(other.requestId).get(),
-    ]);
-    if (!requestDoc.exists || !otherRequestDoc.exists) {
-      return res.status(404).json({ error: "The request behind one of these deliveries no longer exists." });
-    }
-    const myDestination = nearestDistrict(requestDoc.data().location);
-    const otherDestination = nearestDistrict(otherRequestDoc.data().location);
-    if (!myDestination || myDestination !== otherDestination) {
-      return res.status(400).json({ error: "These two deliveries aren't heading to the same district." });
+    if (!(await deliveriesShareDropoff(delivery, other))) {
+      const [requestDoc, otherRequestDoc] = await Promise.all([
+        db.collection("aidRequests").doc(delivery.requestId).get(),
+        db.collection("aidRequests").doc(other.requestId).get(),
+      ]);
+      if (!requestDoc.exists || !otherRequestDoc.exists) {
+        return res.status(404).json({ error: "The request behind one of these deliveries no longer exists." });
+      }
+      const myDestination = nearestDistrict(requestDoc.data().location);
+      const otherDestination = nearestDistrict(otherRequestDoc.data().location);
+      if (!myDestination || myDestination !== otherDestination) {
+        return res.status(400).json({ error: "These two deliveries aren't heading to the same district." });
+      }
     }
 
     const chatId = await createOrGetFellowTravellerChat(req.params.id, req.user.uid, req.params.otherId, other.volunteerId);
@@ -673,13 +717,19 @@ router.post("/:id/handoff", requireAuth, requireRole("volunteer"), async (req, r
 
     // Re-validate the match server-side rather than trusting the client's
     // last fellow-travellers fetch: the two deliveries must still share a
-    // destination district right now.
-    const [myDestination, theirDestination] = await Promise.all([
-      getDeliveryDestinationDistrict(delivery),
-      getDeliveryDestinationDistrict(other),
-    ]);
-    if (!myDestination || myDestination !== theirDestination) {
-      return res.status(400).json({ error: "These two deliveries aren't heading to the same district." });
+    // destination district right now — unless they're literally the same
+    // physical drop-off (dropoffId), in which case a handoff makes sense
+    // regardless of where each item is headed (see deliveriesShareDropoff's
+    // own doc comment above, and "Donation batching" in CLAUDE.md).
+    let myDestination = null;
+    if (!(await deliveriesShareDropoff(delivery, other))) {
+      const theirDestination = await getDeliveryDestinationDistrict(other);
+      myDestination = await getDeliveryDestinationDistrict(delivery);
+      if (!myDestination || myDestination !== theirDestination) {
+        return res.status(400).json({ error: "These two deliveries aren't heading to the same district." });
+      }
+    } else {
+      myDestination = await getDeliveryDestinationDistrict(delivery);
     }
 
     const existingPending = await db

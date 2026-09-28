@@ -169,6 +169,11 @@
     "locationError": "Couldn't get your location. Check browser location permissions.",
     "noActiveEmergencyNote": "No declared emergency currently active in your area — your request will still be reviewed.",
     "notes": "Additional notes (optional)",
+    "notesRequiredForMedicine": "Additional notes",
+    "medicineNotesHint": "Required — please describe the medicine needed (name, dosage, or condition it's for).",
+    "clothingNotesHint": "Optional — it helps to mention how many male/female and approximate clothing sizes.",
+    "describeInNotes": "describe in notes below",
+    "medicineNotesRequired": "Please describe the medicine you need in the notes field (name, dosage, or condition it's for).",
     "submitButton": "Submit Request",
     "submitting": "Submitting...",
     "selectAtLeastOne": "Select at least one item you need.",
@@ -264,6 +269,10 @@
     "fellowTravellersFind": "Find",
     "fellowTravellersNone": "No other volunteers heading the same way right now.",
     "fellowTravellersMessage": "Message",
+    "dropoffBadge": "Part of a {{count}}-item drop-off from {{donorName}}",
+    "sameDropoffBadge": "Same drop-off",
+    "sameVictimBadge": "You're handling {{count}} items for this same victim",
+    "sameRequestBadge": "Same victim",
     "handoffButton": "Hand off",
     "handoffConfirm": "Hand this delivery off to this volunteer? They'll need to accept before it takes effect.",
     "handoffPending": "Handoff request sent — waiting for a response.",
@@ -494,6 +503,9 @@
     "pendingRequests": "Pending requests",
     "noNeed": "No outstanding need right now.",
     "searchPlaceholder": "Search by district...",
-    "noMatch": "No districts match your search."
+    "noMatch": "No districts match your search.",
+    "overallTitle": "Overall need across Sri Lanka",
+    "overallCaption": "{{count}} pending requests across {{districts}} district(s)",
+    "byDistrictTitle": "By district"
   }
 }

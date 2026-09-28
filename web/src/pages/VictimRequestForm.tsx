@@ -47,6 +47,11 @@ export default function VictimRequestForm() {
   const categoryKeys = Object.keys(categoryLimits);
   const detectedDistrict = location ? nearestDistrict(location) : null;
   const districtIsActive = detectedDistrict ? activeDistrictNames.has(detectedDistrict) : false;
+  // Medicine has no meaningful quantity/capacity (max: null server-side) —
+  // the real need is described in free text, so notes become required
+  // instead of showing a quantity field for this one category.
+  const medicineSelected = "medicine" in quantities;
+  const clothingSelected = "clothing" in quantities;
 
   function captureLocation() {
     setLocationStatus("capturing");
@@ -97,6 +102,15 @@ export default function VictimRequestForm() {
     const items = Object.entries(quantities).map(([category, quantity]) => ({ category, quantity }));
     if (items.length === 0) {
       setError(t("victimRequestForm.selectAtLeastOne", "Select at least one item you need."));
+      return;
+    }
+    if (medicineSelected && !notes.trim()) {
+      setError(
+        t(
+          "victimRequestForm.medicineNotesRequired",
+          "Please describe the medicine you need in the notes field (name, dosage, or condition it's for)."
+        )
+      );
       return;
     }
     setSubmitting(true);
@@ -190,12 +204,14 @@ export default function VictimRequestForm() {
                         />
                         {t(`categories.${category}`, limit.label)}
                         <span className="text-xs text-gray-400">
-                          {limit.max === null
-                            ? `(${limit.unit}, ${t("victimRequestForm.noFixedCap")})`
-                            : `(${t("victimRequestForm.upTo")} ${limit.max} ${limit.unit})`}
+                          {category === "medicine"
+                            ? `(${t("victimRequestForm.describeInNotes", "describe in notes below")})`
+                            : limit.max === null
+                              ? `(${limit.unit}, ${t("victimRequestForm.noFixedCap")})`
+                              : `(${t("victimRequestForm.upTo")} ${limit.max} ${limit.unit})`}
                         </span>
                       </label>
-                      {selected && (
+                      {selected && category !== "medicine" && (
                         <input
                           type="number"
                           min={1}
@@ -275,8 +291,31 @@ export default function VictimRequestForm() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              {t("victimRequestForm.notes")}
+              {medicineSelected ? (
+                <>
+                  {t("victimRequestForm.notesRequiredForMedicine", "Additional notes")}{" "}
+                  <span className="text-red-600">*</span>
+                </>
+              ) : (
+                t("victimRequestForm.notes")
+              )}
             </label>
+            {medicineSelected && (
+              <p className="mb-1 text-xs text-gray-500">
+                {t(
+                  "victimRequestForm.medicineNotesHint",
+                  "Required — please describe the medicine needed (name, dosage, or condition it's for)."
+                )}
+              </p>
+            )}
+            {clothingSelected && (
+              <p className="mb-1 text-xs text-gray-500">
+                {t(
+                  "victimRequestForm.clothingNotesHint",
+                  "Optional — it helps to mention how many male/female and approximate clothing sizes."
+                )}
+              </p>
+            )}
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

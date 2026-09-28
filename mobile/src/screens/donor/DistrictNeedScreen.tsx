@@ -53,6 +53,44 @@ export function DistrictNeedScreen() {
     return rows.filter((row) => row.district.toLowerCase().includes(q));
   }, [rows, search]);
 
+  // Overall need — direct user ask for a "live dashboard" view, not just a
+  // flat district×category list: totals per category across every district,
+  // worst-shortage first. Purely a client-side re-aggregation of the same
+  // already-fetched, already-polled `rows` — no new endpoint. Same logic as
+  // web's DonorDistrictNeed.tsx.
+  const totalsByCategory = useMemo(() => {
+    const byCategory: Record<string, { pendingQuantity: number; pendingCount: number; districtCount: number }> = {};
+    for (const row of rows) {
+      if (!byCategory[row.category]) {
+        byCategory[row.category] = { pendingQuantity: 0, pendingCount: 0, districtCount: 0 };
+      }
+      byCategory[row.category].pendingQuantity += row.pendingQuantity;
+      byCategory[row.category].pendingCount += row.pendingCount;
+      byCategory[row.category].districtCount += 1;
+    }
+    return Object.entries(byCategory)
+      .map(([category, totals]) => ({ category, ...totals }))
+      .sort((a, b) => b.pendingQuantity - a.pendingQuantity);
+  }, [rows]);
+
+  // Per-district breakdown, grouped by district (worst-hit first) rather
+  // than a flat district×category list — "each district, all the stuff in
+  // need," per the user's own phrasing.
+  const byDistrict = useMemo(() => {
+    const grouped: Record<string, DistrictNeedRow[]> = {};
+    for (const row of filteredRows) {
+      if (!grouped[row.district]) grouped[row.district] = [];
+      grouped[row.district].push(row);
+    }
+    return Object.entries(grouped)
+      .map(([district, districtRows]) => ({
+        district,
+        rows: districtRows.sort((a, b) => b.pendingQuantity - a.pendingQuantity),
+        totalQuantity: districtRows.reduce((sum, r) => sum + r.pendingQuantity, 0),
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+  }, [filteredRows]);
+
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
@@ -66,46 +104,80 @@ export function DistrictNeedScreen() {
       <Text className="text-2xl font-semibold text-gray-900">{t("donorDistrictNeed.title")}</Text>
       <Text className="mt-1 text-sm text-gray-600">{t("donorDistrictNeed.subtitle")}</Text>
 
-      <View className="mt-4 flex-row items-center rounded-lg border border-gray-300 bg-white px-3">
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder={t("donorDistrictNeed.searchPlaceholder")}
-          accessibilityLabel={t("donorDistrictNeed.searchPlaceholder")}
-          className="flex-1 py-2 text-sm text-gray-900"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity
-            onPress={() => setSearch("")}
-            accessibilityRole="button"
-            accessibilityLabel={t("common.close")}
-          >
-            <Text className="text-gray-400">✕</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {filteredRows.length === 0 ? (
-        <Text className="mt-4 text-sm text-gray-500">
-          {rows.length === 0 ? t("donorDistrictNeed.noNeed") : t("donorDistrictNeed.noMatch")}
-        </Text>
+      {rows.length === 0 ? (
+        <Text className="mt-4 text-sm text-gray-500">{t("donorDistrictNeed.noNeed")}</Text>
       ) : (
-        <View className="mt-4" style={{ gap: 10 }}>
-          {filteredRows.map((row) => (
-            <View key={`${row.district}::${row.category}`} className="rounded-xl border border-gray-200 bg-white p-4">
-              <Text className="text-sm font-semibold text-gray-900">{row.district}</Text>
-              <View className="mt-1 flex-row items-center justify-between">
-                <Text className="text-xs capitalize text-gray-600">
-                  {t(`categories.${row.category}`, { defaultValue: row.category })}
+        <>
+          <Text className="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-700">
+            {t("donorDistrictNeed.overallTitle")}
+          </Text>
+          <View className="mt-2 flex-row flex-wrap" style={{ gap: 8 }}>
+            {totalsByCategory.map((c) => (
+              <View
+                key={c.category}
+                className="rounded-xl border border-gray-200 bg-white p-3"
+                style={{ width: "48%" }}
+              >
+                <Text className="text-xs capitalize text-gray-500">
+                  {t(`categories.${c.category}`, { defaultValue: c.category })}
                 </Text>
-                <Text className="text-sm font-medium text-gray-900">{row.pendingQuantity}</Text>
+                <Text className="mt-1 text-xl font-semibold text-gray-900">{c.pendingQuantity}</Text>
+                <Text className="mt-1 text-xs text-gray-400">
+                  {t("donorDistrictNeed.overallCaption", { count: c.pendingCount, districts: c.districtCount })}
+                </Text>
               </View>
-              <Text className="mt-1 text-xs text-gray-400">
-                {row.pendingCount} {t("donorDistrictNeed.pendingRequests").toLowerCase()}
-              </Text>
+            ))}
+          </View>
+
+          <Text className="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-700">
+            {t("donorDistrictNeed.byDistrictTitle")}
+          </Text>
+          <View className="mt-2 flex-row items-center rounded-lg border border-gray-300 bg-white px-3">
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={t("donorDistrictNeed.searchPlaceholder")}
+              accessibilityLabel={t("donorDistrictNeed.searchPlaceholder")}
+              className="flex-1 py-2 text-sm text-gray-900"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch("")}
+                accessibilityRole="button"
+                accessibilityLabel={t("common.close")}
+              >
+                <Text className="text-gray-400">✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {byDistrict.length === 0 ? (
+            <Text className="mt-4 text-sm text-gray-500">{t("donorDistrictNeed.noMatch")}</Text>
+          ) : (
+            <View className="mt-3" style={{ gap: 10 }}>
+              {byDistrict.map(({ district, rows: districtRows }) => (
+                <View key={district} className="rounded-xl border border-gray-200 bg-white p-4">
+                  <Text className="text-sm font-semibold text-gray-900">{district}</Text>
+                  <View className="mt-2" style={{ gap: 4 }}>
+                    {districtRows.map((row) => (
+                      <View key={row.category} className="flex-row items-center justify-between">
+                        <Text className="text-xs capitalize text-gray-600">
+                          {t(`categories.${row.category}`, { defaultValue: row.category })}
+                        </Text>
+                        <Text className="text-xs font-medium text-gray-900">
+                          {row.pendingQuantity}{" "}
+                          <Text className="font-normal text-gray-400">
+                            ({row.pendingCount} {t("donorDistrictNeed.pendingRequests").toLowerCase()})
+                          </Text>
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          )}
+        </>
       )}
     </ScrollView>
   );

@@ -47,6 +47,10 @@ export type VolunteerTabParamList = {
   Home: undefined;
   MyDeliveries: undefined;
   CommunityReport: undefined;
+  // Reached from a delivery card's "Navigate" button, not a Home tile — a
+  // hidden tab (same convention as MyDeliveries/CommunityReport) carrying
+  // which delivery to route to/from.
+  VolunteerNavigation: { deliveryId: string };
   Notifications: undefined;
   SeverityMap: undefined;
   Messages: NavigatorScreenParams<MessagesStackParamList>;
@@ -67,6 +71,7 @@ export type AdminTabParamList = {
   Home: undefined;
   SosDispatch: undefined;
   Notifications: undefined;
+  Messages: NavigatorScreenParams<MessagesStackParamList>;
   SituationMap: undefined;
   Settings: undefined;
   Overview: undefined;

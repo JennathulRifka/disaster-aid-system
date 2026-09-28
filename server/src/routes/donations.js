@@ -6,7 +6,8 @@ const { computeOverallStatus } = require("../utils/requestItemStatus");
 const { distanceKm } = require("../utils/geo");
 const { nearestDistrict } = require("../utils/districts");
 const { logAction } = require("../utils/auditLog");
-const { findBestVolunteer } = require("../utils/autoAssignVolunteer");
+const crypto = require("crypto");
+const { findBestVolunteer, findVolunteerForDropoff, findVolunteerForRequest } = require("../utils/autoAssignVolunteer");
 const { createChatForSelfDelivery } = require("../utils/deliveryChats");
 const { sendNotificationToUser } = require("../utils/notifications");
 
@@ -64,6 +65,11 @@ router.post("/", requireAuth, requireRole("donor"), async (req, res) => {
       assignedDeliveryId: null,
       deliveryStatus: null,
       pendingAllocatedQuantity: null,
+      // null here (not a generated id) — a single-item donation has nothing
+      // to group with. See POST /batch below for the multi-category case
+      // this field actually exists for.
+      dropoffId: null,
+      dropoffItemCount: 1,
       createdAt: now,
       updatedAt: now,
     };
@@ -73,6 +79,103 @@ router.post("/", requireAuth, requireRole("donor"), async (req, res) => {
   } catch (err) {
     console.error("Create donation error:", err.message);
     return res.status(500).json({ error: "Failed to create donation.", details: err.message });
+  }
+});
+
+/**
+ * POST /api/donations/batch
+ * Donor registers several categories from one drop-off in a single call.
+ * Body: { items: [{category, quantity, quantityValue}], location,
+ *          deliveryMethod: "self"|"volunteer", notes? }
+ *
+ * Replaces the donor forms' previous approach of firing one POST / per
+ * selected category (Promise.allSettled, partial-failure handling on the
+ * client) — see "Multi-category donations" in CLAUDE.md for why donations
+ * stayed single-category-per-document rather than growing an items[] array
+ * like aidRequests. That's still true here: this still creates one donation
+ * document per category, just atomically and with a shared `dropoffId`
+ * (crypto.randomBytes, same convention as generateConfirmToken() in
+ * deliveries.js) tagging them as one physical pickup.
+ *
+ * Written as a single Firestore batch() write — atomic, all-or-nothing —
+ * which is a real improvement over the old per-category POST loop, not just
+ * a grouping label: a category-cap violation on item 3 of 5 now fails the
+ * whole submission cleanly instead of leaving 2 real donations behind that
+ * the donor then has to notice and reconcile.
+ *
+ * `dropoffId` is why a volunteer picking up 3 items from one donor can see
+ * they're linked (see "Donation batching" in CLAUDE.md) and why
+ * auto-assignment (findVolunteerForDropoff, called from POST /:id/match
+ * below) can keep the same volunteer across the whole batch instead of
+ * independently recomputing nearest-available per category.
+ */
+router.post("/batch", requireAuth, requireRole("donor"), async (req, res) => {
+  try {
+    const { items, location, deliveryMethod, notes } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "At least one item is required." });
+    }
+    if (!location || !deliveryMethod) {
+      return res.status(400).json({ error: "location and deliveryMethod are required." });
+    }
+    if (!["self", "volunteer"].includes(deliveryMethod)) {
+      return res.status(400).json({ error: 'deliveryMethod must be "self" or "volunteer".' });
+    }
+
+    const categoryLimits = await getCategoryLimits();
+    const seenCategories = new Set();
+    for (const item of items) {
+      if (!item?.category || !Object.keys(categoryLimits).includes(item.category)) {
+        return res.status(400).json({ error: `"${item?.category}" is not a recognized category.` });
+      }
+      if (seenCategories.has(item.category)) {
+        return res.status(400).json({ error: `"${item.category}" was selected more than once.` });
+      }
+      seenCategories.add(item.category);
+      const numericQuantity = Number(item.quantityValue);
+      if (!item.quantity || !Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+        return res.status(400).json({ error: `A valid quantity is required for "${item.category}".` });
+      }
+    }
+
+    const dropoffId = crypto.randomBytes(8).toString("hex");
+    const now = new Date().toISOString();
+    const district = nearestDistrict(location);
+    const batch = db.batch();
+    const created = [];
+
+    for (const item of items) {
+      const donation = {
+        donorId: req.user.uid,
+        donorName: req.user.name,
+        category: item.category,
+        quantity: item.quantity,
+        quantityValue: Number(item.quantityValue),
+        remainingQuantity: Number(item.quantityValue),
+        district,
+        location,
+        deliveryMethod,
+        notes: notes || "",
+        status: "available",
+        matchedRequestId: null,
+        assignedDeliveryId: null,
+        deliveryStatus: null,
+        pendingAllocatedQuantity: null,
+        dropoffId,
+        dropoffItemCount: items.length,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const ref = db.collection("donations").doc();
+      batch.set(ref, donation);
+      created.push({ id: ref.id, ...donation });
+    }
+
+    await batch.commit();
+    return res.status(201).json({ dropoffId, donations: created });
+  } catch (err) {
+    console.error("Create donation batch error:", err.message);
+    return res.status(500).json({ error: "Failed to create donations.", details: err.message });
   }
 });
 
@@ -213,6 +316,8 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
         method: "self",
         status: "accepted", // self-delivery skips the volunteer accept step
         currentLocation: null,
+        dropoffId: donation.dropoffId || null,
+        donorName: donation.donorName,
         createdAt: now,
         updatedAt: now,
       };
@@ -222,17 +327,41 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
       donationUpdate.deliveryStatus = "accepted";
       await createChatForSelfDelivery(deliveryId, bestMatch.id, req.params.id, donation.donorId, bestMatch.victimId);
     } else {
-      // Volunteer delivery — try to auto-assign the nearest available
-      // volunteer. Leaves the donation unassigned (same as before this
-      // feature existed) if nobody qualifies, so an admin can still assign
-      // manually from AdminDonations.tsx. pendingAllocatedQuantity carries
-      // this match's consumedQuantity forward so the manual-assign route
-      // (POST / below) can attach the right allocatedQuantity once a
-      // delivery finally gets created — the match itself already happened
-      // and remainingQuantity is already decremented, so this value can't
-      // be recomputed later from remainingQuantity alone.
+      // Volunteer delivery — three-tier preference before falling back to
+      // ordinary nearest-available matching:
+      //  1. Another donation from the same physical drop-off (dropoffId)
+      //     already has an active delivery — prefer that same volunteer
+      //     (see findVolunteerForDropoff's own doc comment; the fix for a
+      //     multi-category drop-off fragmenting across several volunteers
+      //     who don't know about each other).
+      //  2. Otherwise, another item on the SAME request (same victim, but
+      //     from a different, unrelated donor) already has an active
+      //     delivery — prefer that same volunteer too (see
+      //     findVolunteerForRequest's own doc comment; the fix for one
+      //     victim's multi-item request being scattered across several
+      //     volunteers who each show up separately at the same household).
+      //  3. Otherwise, ordinary nearest-available matching.
+      // Leaves the donation unassigned (same as before this feature
+      // existed) if nobody qualifies, so an admin can still assign manually
+      // from AdminDonations.tsx. pendingAllocatedQuantity carries this
+      // match's consumedQuantity forward so the manual-assign route (POST /
+      // below) can attach the right allocatedQuantity once a delivery
+      // finally gets created — the match itself already happened and
+      // remainingQuantity is already decremented, so this value can't be
+      // recomputed later from remainingQuantity alone.
       donationUpdate.pendingAllocatedQuantity = consumedQuantity;
-      const volunteer = await findBestVolunteer(donation.location);
+      let assignSource = "auto";
+      let volunteer = await findVolunteerForDropoff(donation.dropoffId, req.params.id);
+      if (volunteer) {
+        assignSource = "auto_dropoff";
+      } else {
+        volunteer = await findVolunteerForRequest(bestMatch.id, req.params.id);
+        if (volunteer) {
+          assignSource = "auto_request";
+        } else {
+          volunteer = await findBestVolunteer(donation.location);
+        }
+      }
       if (volunteer) {
         const delivery = {
           requestId: bestMatch.id,
@@ -243,6 +372,8 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
           method: "volunteer",
           status: "pending_acceptance",
           currentLocation: null,
+          dropoffId: donation.dropoffId || null,
+          donorName: donation.donorName,
           createdAt: now,
           updatedAt: now,
         };
@@ -251,13 +382,18 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
         donationUpdate.assignedDeliveryId = deliveryId;
         donationUpdate.deliveryStatus = "pending_acceptance";
         donationUpdate.pendingAllocatedQuantity = null; // consumed by the delivery we just created
-        autoAssignedVolunteer = { id: volunteer.uid, name: volunteer.name };
+        autoAssignedVolunteer = {
+          id: volunteer.uid,
+          name: volunteer.name,
+          sameDropoff: assignSource === "auto_dropoff",
+          sameRequest: assignSource === "auto_request",
+        };
         await logAction(req.user, "delivery.assign", { type: "delivery", id: deliveryId }, {
           requestId: bestMatch.id,
           donationId: req.params.id,
           volunteerId: volunteer.uid,
           volunteerName: volunteer.name,
-          source: "auto",
+          source: assignSource,
         });
         await sendNotificationToUser(volunteer.uid, {
           title: "New delivery assignment",

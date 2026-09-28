@@ -18,6 +18,7 @@ import { DistrictInventoryScreen } from "../screens/admin/DistrictInventoryScree
 import { SituationMapScreen } from "../screens/admin/SituationMapScreen";
 import { NotificationsScreen } from "../screens/shared/NotificationsScreen";
 import { SettingsScreen } from "../screens/shared/SettingsScreen";
+import { MessagesStack } from "./MessagesStack";
 import { LogoutButton } from "../components/LogoutButton";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 
@@ -97,6 +98,19 @@ export function AdminTabs() {
         name="SituationMap"
         component={SituationMapScreen}
         options={{ title: "Situation Map", tabBarIcon: tabIcon("map-outline", "map") }}
+      />
+      {/* Reuses the exact same MessagesStack (ChatList + ChatThread) as the
+          other three roles, for tab-bar parity — direct user ask. An admin
+          is never a delivery-chat participant (chats.js's GET /mine, which
+          this screen calls, filters strictly by partyAId/partyBId == caller
+          — see "Delivery chat" in CLAUDE.md), so this tab will always show
+          an empty conversation list rather than any oversight view of other
+          users' chats; that's a deliberate, existing privacy boundary this
+          tab doesn't touch, not a bug. */}
+      <Tab.Screen
+        name="Messages"
+        component={MessagesStack}
+        options={{ title: "Messages", headerShown: false, tabBarIcon: tabIcon("chatbubble-outline", "chatbubble") }}
       />
       <Tab.Screen
         name="Settings"

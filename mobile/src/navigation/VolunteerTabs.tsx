@@ -5,6 +5,7 @@ import type { VolunteerTabParamList } from "./types";
 import { VolunteerHomeScreen } from "../screens/volunteer/VolunteerHomeScreen";
 import { MyDeliveriesScreen } from "../screens/volunteer/MyDeliveriesScreen";
 import { VolunteerCommunityReportScreen } from "../screens/volunteer/VolunteerCommunityReportScreen";
+import { VolunteerNavigationScreen } from "../screens/volunteer/VolunteerNavigationScreen";
 import { NotificationsScreen } from "../screens/shared/NotificationsScreen";
 import { SeverityMapScreen } from "../screens/shared/SeverityMapScreen";
 import { SettingsScreen } from "../screens/shared/SettingsScreen";
@@ -55,6 +56,11 @@ export function VolunteerTabs() {
         name="CommunityReport"
         component={VolunteerCommunityReportScreen}
         options={{ title: "Report Condition", tabBarButton: () => null, tabBarItemStyle: HIDDEN_TAB_STYLE }}
+      />
+      <Tab.Screen
+        name="VolunteerNavigation"
+        component={VolunteerNavigationScreen}
+        options={{ title: "Navigate", tabBarButton: () => null, tabBarItemStyle: HIDDEN_TAB_STYLE }}
       />
       <Tab.Screen
         name="Notifications"

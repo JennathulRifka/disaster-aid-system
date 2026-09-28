@@ -87,11 +87,13 @@ export function DonationsScreen() {
     try {
       const result = await apiFetch(`/api/donations/${id}/match`, { method: "POST" });
       const base = `Matched to request ${result.matchedRequestId} (${result.distanceKm} km away).`;
-      setMessage(
-        result.autoAssignedVolunteer
-          ? `${base} Auto-assigned to ${result.autoAssignedVolunteer.name} (nearest available).`
-          : base
-      );
+      const av = result.autoAssignedVolunteer;
+      const reason = av?.sameDropoff
+        ? "same volunteer already handling another item from this drop-off"
+        : av?.sameRequest
+        ? "same volunteer already handling another item for this victim"
+        : "nearest available";
+      setMessage(av ? `${base} Auto-assigned to ${av.name} (${reason}).` : base);
     } catch (err: any) {
       setMessage(err.message || "No matching request found.");
     } finally {

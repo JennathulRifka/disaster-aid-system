@@ -7,6 +7,10 @@ import type { AuthStackParamList } from "../../navigation/types";
 import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 import { StatCard } from "../../components/StatCard";
 import { AreaSeverityMap } from "../../components/AreaSeverityMap";
+import { AccessibilityControls } from "../../components/AccessibilityControls";
+import { MapWalkthroughModal } from "../../components/MapWalkthroughModal";
+import { AppText } from "../../components/AppText";
+import { useMapWalkthrough } from "../../hooks/useMapWalkthrough";
 import { apiFetch } from "../../lib/api";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Home">;
@@ -52,6 +56,14 @@ export function HomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const [stats, setStats] = useState<Stats | null>(null);
   const [showMap, setShowMap] = useState(false);
+  // Unlike SeverityMapScreen.tsx (where the map is always visible, so the
+  // walkthrough auto-opens on mount, matching web's PublicSeverityMap.tsx),
+  // this screen hides its map behind a toggle — auto-opening a map tour
+  // before the map is even shown would be confusing. Gating the modal's
+  // render on `showMap` means it naturally opens the first time a user
+  // actually reveals the map (still only once ever, per the hook's own
+  // AsyncStorage-backed dismissal), not before.
+  const walkthrough = useMapWalkthrough();
   // Defaults open on every mount — the "when the app is opened" welcome
   // prompt. Closing it (the ✕, the backdrop, or Android's back button) just
   // dismisses to reveal this same screen's content underneath (the "page
@@ -76,15 +88,25 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 24, paddingTop: 56 }}>
-      <View className="mb-6 flex-row justify-end">
+      <View className="mb-6 flex-row items-center justify-end" style={{ gap: 8 }}>
+        <AccessibilityControls
+          onShowHelp={() => {
+            setShowMap(true);
+            walkthrough.show();
+          }}
+        />
         <LanguageSwitcher />
       </View>
 
       <Text className="text-2xl font-bold text-gray-900">Disaster Aid</Text>
       <Text className="text-sm text-gray-500">Sri Lanka</Text>
 
-      <Text className="mt-6 text-xl font-semibold text-gray-900">{t("landing.heroTitle")}</Text>
-      <Text className="mt-2 text-sm leading-5 text-gray-600">{t("landing.heroSubtitle")}</Text>
+      <AppText baseSize={20} className="mt-6 font-semibold leading-6 text-gray-900">
+        {t("landing.heroTitle")}
+      </AppText>
+      <AppText baseSize={14} muted className="mt-2 leading-5 text-gray-600">
+        {t("landing.heroSubtitle")}
+      </AppText>
 
       <View className="mt-6 flex-row flex-wrap justify-between" style={{ gap: 12 }}>
         {stats ? (
@@ -160,6 +182,8 @@ export function HomeScreen({ navigation }: Props) {
           </View>
         )}
       </View>
+
+      <MapWalkthroughModal open={showMap && walkthrough.open} onClose={walkthrough.dismiss} />
 
       <Modal visible={welcomeVisible} transparent animationType="fade" onRequestClose={() => setWelcomeVisible(false)}>
         <View className="flex-1 items-center justify-center bg-black/50 px-6" accessibilityViewIsModal>
