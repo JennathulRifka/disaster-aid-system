@@ -1,80 +1,80 @@
 
- RUN  v4.1.11 C:/Users/SINGER/Documents/GitHub/disaster-aid-system/server
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90mC:/Users/SINGER/Documents/GitHub/disaster-aid-system/server[39m
 
- ✓ src/utils/__tests__/districts.test.js > DISTRICTS > has all 25 of Sri Lanka's real administrative districts, no duplicates 2ms
- ✓ src/utils/__tests__/districts.test.js > DISTRICTS > every district has plausible Sri Lankan coordinates 4ms
- ✓ src/utils/__tests__/districts.test.js > nearestDistrict > matches a point exactly at a district's own centroid to that district 1ms
- ✓ src/utils/__tests__/districts.test.js > nearestDistrict > matches a point slightly offset from a centroid to the same nearest district 0ms
- ✓ src/utils/__tests__/districts.test.js > nearestDistrict > picks the genuinely closest district for a point between two candidates 1ms
- ✓ src/utils/__tests__/volunteerRanking.test.js > rankVolunteers (automatic volunteer assignment) > ranks the nearest volunteer first 3ms
- ✓ src/utils/__tests__/volunteerRanking.test.js > rankVolunteers (automatic volunteer assignment) > tie-breaks equally-distant volunteers by fewest active deliveries 1ms
- ✓ src/utils/__tests__/volunteerRanking.test.js > rankVolunteers (automatic volunteer assignment) > distance always wins over workload — a slightly farther but idle volunteer still loses to a nearer busy one 0ms
- ✓ src/utils/__tests__/volunteerRanking.test.js > rankVolunteers (automatic volunteer assignment) > treats a volunteer with no active-delivery count on record as having zero (not undefined/NaN) 0ms
- ✓ src/utils/__tests__/volunteerRanking.test.js > rankVolunteers (automatic volunteer assignment) > returns an empty array for no candidates, rather than throwing 1ms
- ✓ src/utils/__tests__/volunteerRanking.test.js > rankVolunteers (automatic volunteer assignment) > computes a real, sane distance for each ranked candidate 0ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > DesInventar flood records data integrity > has a substantial number of real historical records 2ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > DesInventar flood records data integrity > every record has the expected schema 13ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > DesInventar flood records data integrity > every district name maps to a real Sri Lankan district (via the alias table if needed) 3ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > DesInventar flood records data integrity > covers a multi-decade year range within the model's training window 1ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > has the expected top-level structure 0ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > training did not diverge — every weight and the bias are finite numbers 0ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > every district-month historical base rate is a valid probability 15ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > matches known Sri Lankan monsoon geography: Ratnapura (May) floods far more often than Mannar (February) 0ms
- ✓ src/utils/__tests__/floodRiskModel.data.test.js > Trained flood-risk-model.json sanity > the model's own reported top-decile precision genuinely beats its base rate 1ms
- ✓ src/utils/__tests__/floodPrediction.test.js > riskLevelFor > buckets probabilities into the 4 documented risk levels 3ms
- ✓ src/utils/__tests__/floodPrediction.test.js > sigmoid > returns exactly 0.5 at z=0 1ms
- ✓ src/utils/__tests__/floodPrediction.test.js > sigmoid > approaches 1 for large positive z and 0 for large negative z 0ms
- ✓ src/utils/__tests__/floodPrediction.test.js > currentMonthProjectedTotal > projects a full-month total from the days observed so far 1ms
- ✓ src/utils/__tests__/floodPrediction.test.js > currentMonthProjectedTotal > skips -999 (missing) days rather than counting them as zero rainfall 0ms
- ✓ src/utils/__tests__/floodPrediction.test.js > currentMonthProjectedTotal > falls back to the recent average rate when zero days are observed yet 0ms
- ✓ src/utils/__tests__/floodPrediction.test.js > recentAverageDailyRate > averages the most recent N fully-reported days ending at 'now' 0ms
- ✓ src/utils/__tests__/floodPrediction.test.js > recentAverageDailyRate > returns 0 when no valid days are found at all 0ms
- ✓ src/utils/__tests__/floodPrediction.test.js > prior30dTotal > sums exactly the 30 days immediately before the given month start 1ms
- ✓ src/utils/__tests__/floodPrediction.test.js > prior30dTotal > ignores days on or after the month start 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > normalizeAddress > lowercases, trims, and collapses internal whitespace 2ms
- ✓ src/utils/__tests__/requestValidation.test.js > normalizeAddress > treats differently-cased/spaced versions of the same address as equal 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > normalizeAddress > returns an empty string for null/undefined rather than throwing 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > normalizeNic > uppercases and trims 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > normalizeNic > treats differently-cased versions of the same NIC as equal 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > normalizeNic > returns an empty string for null/undefined rather than throwing 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > rejects an empty or missing items array 1ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > accepts a single valid item within its cap 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > rejects an unrecognized category 1ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > rejects the same category listed twice 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > rejects a zero or negative quantity 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > rejects a non-numeric quantity 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > enforces the real documented per-category caps (food: 10kg) 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > enforces the shelter cap of 1 unit 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > never caps medicine — max: null means uncapped (flagged for admin review elsewhere instead) 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > accepts a valid multi-category request across several categories at once 0ms
- ✓ src/utils/__tests__/requestValidation.test.js > validateItems (category cap enforcement) > catches a cap violation even when it's not the first item in a multi-item request 0ms
- ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > weights severity levels correctly 4ms
- ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > defaults unknown/missing severity to the 'low' weight rather than 0 1ms
- ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > scores 2 points per person affected, capped at 30 0ms
- ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > scores 5 points per vulnerable group, capped at 25 0ms
- ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > treats a missing vulnerableGroups array as zero, not a crash 0ms
- ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > total is the sum of all four criteria, rounded to 2 decimals 1ms
- ✓ src/utils/__tests__/priorityScore.test.js > calculatePriorityScore > waitScore grows with elapsed time and caps at 20 1ms
- ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > normalizes a local-format number (leading 0) 3ms
- ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > normalizes an already-international number with + 0ms
- ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > normalizes a bare international number with no + 0ms
- ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > normalizes a 9-digit number with no leading 0 or country code 0ms
- ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > strips spaces and dashes before normalizing 0ms
- ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > rejects landline numbers (011... etc, second digit isn't 7) 0ms
- ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > rejects garbage input 0ms
- ✓ src/utils/__tests__/phone.test.js > normalizeSriLankanPhone > returns null for empty/falsy input rather than throwing 0ms
- ✓ src/utils/__tests__/geo.test.js > distanceKm > returns 0 for identical points 3ms
- ✓ src/utils/__tests__/geo.test.js > distanceKm > returns a real-world-accurate distance between two known cities 1ms
- ✓ src/utils/__tests__/geo.test.js > distanceKm > is symmetric regardless of argument order 0ms
- ✓ src/utils/__tests__/geo.test.js > distanceKm > returns Infinity when either point is missing 0ms
- ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'verified' when every item is still pending 3ms
- ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'in_progress' when at least one item has moved but not all delivered 0ms
- ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'in_progress' when some are delivered but not all 0ms
- ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'delivered' only when every item is delivered 0ms
- ✓ src/utils/__tests__/requestItemStatus.test.js > computeOverallStatus > is 'delivered' for a single-item request that's delivered 0ms
+ [32m✓[39m src/utils/__tests__/priorityScore.test.js[2m > [22mcalculatePriorityScore[2m > [22mweights severity levels correctly[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/priorityScore.test.js[2m > [22mcalculatePriorityScore[2m > [22mdefaults unknown/missing severity to the 'low' weight rather than 0[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/priorityScore.test.js[2m > [22mcalculatePriorityScore[2m > [22mscores 2 points per person affected, capped at 30[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/priorityScore.test.js[2m > [22mcalculatePriorityScore[2m > [22mscores 5 points per vulnerable group, capped at 25[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/priorityScore.test.js[2m > [22mcalculatePriorityScore[2m > [22mtreats a missing vulnerableGroups array as zero, not a crash[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/priorityScore.test.js[2m > [22mcalculatePriorityScore[2m > [22mtotal is the sum of all four criteria, rounded to 2 decimals[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/priorityScore.test.js[2m > [22mcalculatePriorityScore[2m > [22mwaitScore grows with elapsed time and caps at 20[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/districts.test.js[2m > [22mDISTRICTS[2m > [22mhas all 25 of Sri Lanka's real administrative districts, no duplicates[32m 3[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/districts.test.js[2m > [22mDISTRICTS[2m > [22mevery district has plausible Sri Lankan coordinates[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/districts.test.js[2m > [22mnearestDistrict[2m > [22mmatches a point exactly at a district's own centroid to that district[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/districts.test.js[2m > [22mnearestDistrict[2m > [22mmatches a point slightly offset from a centroid to the same nearest district[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/districts.test.js[2m > [22mnearestDistrict[2m > [22mpicks the genuinely closest district for a point between two candidates[32m 2[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mDesInventar flood records data integrity[2m > [22mhas a substantial number of real historical records[32m 4[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mDesInventar flood records data integrity[2m > [22mevery record has the expected schema[32m 30[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mDesInventar flood records data integrity[2m > [22mevery district name maps to a real Sri Lankan district (via the alias table if needed)[32m 4[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mDesInventar flood records data integrity[2m > [22mcovers a multi-decade year range within the model's training window[32m 2[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mTrained flood-risk-model.json sanity[2m > [22mhas the expected top-level structure[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mTrained flood-risk-model.json sanity[2m > [22mtraining did not diverge — every weight and the bias are finite numbers[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mTrained flood-risk-model.json sanity[2m > [22mevery district-month historical base rate is a valid probability[32m 50[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mTrained flood-risk-model.json sanity[2m > [22mmatches known Sri Lankan monsoon geography: Ratnapura (May) floods far more often than Mannar (February)[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodRiskModel.data.test.js[2m > [22mTrained flood-risk-model.json sanity[2m > [22mthe model's own reported top-decile precision genuinely beats its base rate[32m 7[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22mriskLevelFor[2m > [22mbuckets probabilities into the 4 documented risk levels[32m 4[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22msigmoid[2m > [22mreturns exactly 0.5 at z=0[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22msigmoid[2m > [22mapproaches 1 for large positive z and 0 for large negative z[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22mcurrentMonthProjectedTotal[2m > [22mprojects a full-month total from the days observed so far[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22mcurrentMonthProjectedTotal[2m > [22mskips -999 (missing) days rather than counting them as zero rainfall[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22mcurrentMonthProjectedTotal[2m > [22mfalls back to the recent average rate when zero days are observed yet[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22mrecentAverageDailyRate[2m > [22maverages the most recent N fully-reported days ending at 'now'[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22mrecentAverageDailyRate[2m > [22mreturns 0 when no valid days are found at all[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22mprior30dTotal[2m > [22msums exactly the 30 days immediately before the given month start[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/floodPrediction.test.js[2m > [22mprior30dTotal[2m > [22mignores days on or after the month start[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mnormalizeAddress[2m > [22mlowercases, trims, and collapses internal whitespace[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mnormalizeAddress[2m > [22mtreats differently-cased/spaced versions of the same address as equal[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mnormalizeAddress[2m > [22mreturns an empty string for null/undefined rather than throwing[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mnormalizeNic[2m > [22muppercases and trims[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mnormalizeNic[2m > [22mtreats differently-cased versions of the same NIC as equal[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mnormalizeNic[2m > [22mreturns an empty string for null/undefined rather than throwing[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22mrejects an empty or missing items array[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22maccepts a single valid item within its cap[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22mrejects an unrecognized category[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22mrejects the same category listed twice[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22mrejects a zero or negative quantity[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22mrejects a non-numeric quantity[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22menforces the real documented per-category caps (food: 10kg)[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22menforces the shelter cap of 1 unit[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22mnever caps medicine — max: null means uncapped (flagged for admin review elsewhere instead)[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22maccepts a valid multi-category request across several categories at once[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestValidation.test.js[2m > [22mvalidateItems (category cap enforcement)[2m > [22mcatches a cap violation even when it's not the first item in a multi-item request[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/volunteerRanking.test.js[2m > [22mrankVolunteers (automatic volunteer assignment)[2m > [22mranks the nearest volunteer first[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/volunteerRanking.test.js[2m > [22mrankVolunteers (automatic volunteer assignment)[2m > [22mtie-breaks equally-distant volunteers by fewest active deliveries[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/volunteerRanking.test.js[2m > [22mrankVolunteers (automatic volunteer assignment)[2m > [22mdistance always wins over workload — a slightly farther but idle volunteer still loses to a nearer busy one[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/volunteerRanking.test.js[2m > [22mrankVolunteers (automatic volunteer assignment)[2m > [22mtreats a volunteer with no active-delivery count on record as having zero (not undefined/NaN)[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/volunteerRanking.test.js[2m > [22mrankVolunteers (automatic volunteer assignment)[2m > [22mreturns an empty array for no candidates, rather than throwing[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/volunteerRanking.test.js[2m > [22mrankVolunteers (automatic volunteer assignment)[2m > [22mcomputes a real, sane distance for each ranked candidate[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/phone.test.js[2m > [22mnormalizeSriLankanPhone[2m > [22mnormalizes a local-format number (leading 0)[32m 4[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/phone.test.js[2m > [22mnormalizeSriLankanPhone[2m > [22mnormalizes an already-international number with +[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/phone.test.js[2m > [22mnormalizeSriLankanPhone[2m > [22mnormalizes a bare international number with no +[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/phone.test.js[2m > [22mnormalizeSriLankanPhone[2m > [22mnormalizes a 9-digit number with no leading 0 or country code[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/phone.test.js[2m > [22mnormalizeSriLankanPhone[2m > [22mstrips spaces and dashes before normalizing[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/phone.test.js[2m > [22mnormalizeSriLankanPhone[2m > [22mrejects landline numbers (011... etc, second digit isn't 7)[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/phone.test.js[2m > [22mnormalizeSriLankanPhone[2m > [22mrejects garbage input[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/phone.test.js[2m > [22mnormalizeSriLankanPhone[2m > [22mreturns null for empty/falsy input rather than throwing[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestItemStatus.test.js[2m > [22mcomputeOverallStatus[2m > [22mis 'verified' when every item is still pending[32m 4[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestItemStatus.test.js[2m > [22mcomputeOverallStatus[2m > [22mis 'in_progress' when at least one item has moved but not all delivered[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestItemStatus.test.js[2m > [22mcomputeOverallStatus[2m > [22mis 'in_progress' when some are delivered but not all[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestItemStatus.test.js[2m > [22mcomputeOverallStatus[2m > [22mis 'delivered' only when every item is delivered[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/requestItemStatus.test.js[2m > [22mcomputeOverallStatus[2m > [22mis 'delivered' for a single-item request that's delivered[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/geo.test.js[2m > [22mdistanceKm[2m > [22mreturns 0 for identical points[32m 2[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/geo.test.js[2m > [22mdistanceKm[2m > [22mreturns a real-world-accurate distance between two known cities[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/geo.test.js[2m > [22mdistanceKm[2m > [22mis symmetric regardless of argument order[32m 0[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/geo.test.js[2m > [22mdistanceKm[2m > [22mreturns Infinity when either point is missing[32m 0[2mms[22m[39m
 
- Test Files  9 passed (9)
-      Tests  71 passed (71)
-   Start at  05:41:14
-   Duration  1.40s (transform 104ms, setup 0ms, import 242ms, tests 110ms, environment 2ms)
+[2m Test Files [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+[2m      Tests [22m [1m[32m71 passed[39m[22m[90m (71)[39m
+[2m   Start at [22m 16:00:09
+[2m   Duration [22m 2.15s[2m (transform 238ms, setup 0ms, import 429ms, tests 212ms, environment 2ms)[22m
 

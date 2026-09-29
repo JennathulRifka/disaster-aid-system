@@ -1,6 +1,6 @@
 # Firestore Security Rules Test Results
 
-Generated: 2026-09-29T00:27:41.841Z
+Generated: 2026-09-29T10:38:55.833Z
 Method: direct Firestore REST API calls (bypassing the Express API and the Admin SDK entirely) with real Firebase ID tokens for real throwaway accounts, against `firestore-rules/firestore.rules` as actually deployed — not a reading of the rules file, a test of what Firestore itself currently enforces.
 
 ## Summary
