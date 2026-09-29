@@ -2,6 +2,7 @@ require("dotenv").config();
 const app = require("./app");
 const { logger } = require("./utils/logger");
 const { checkWaterLevelsAndAlert, checkReservoirsAndAlert } = require("./utils/waterLevelAlerts");
+const externalRoutes = require("./routes/external");
 
 const PORT = process.env.PORT || 5000;
 const WATER_LEVEL_ALERT_POLL_MS = 10 * 60 * 1000; // 10 min — matches the operational urgency without re-checking on every cache refresh
@@ -10,6 +11,11 @@ const RESERVOIR_ALERT_POLL_MS = 60 * 60 * 1000; // 1h — the reservoir bulletin
 app.listen(PORT, () => {
   logger.info(`Disaster Aid API listening on http://localhost:${PORT}`);
 });
+
+// Deliberately NOT a module-level side effect in routes/external.js itself —
+// see that file's comment on warmDistrictBoundariesCache() for why: this
+// call is only safe from a real, long-lived process like this one.
+externalRoutes.warmDistrictBoundariesCache();
 
 // Run once at startup (so gauge state is initialized without waiting a full
 // poll cycle) and then on a timer — this is what actually detects a rising

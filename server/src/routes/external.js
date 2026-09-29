@@ -935,18 +935,38 @@ router.post("/flood-risk/retrain", requireAuth, requireRole("admin"), async (req
   }
 });
 
-// Warm the cache once at server startup rather than making whichever
-// request happens to arrive first (possibly a real user opening the map
-// during a demo) wait 1-2+ minutes for the initial download.
-getCached("district-boundaries", DISTRICT_BOUNDARIES_CACHE_TTL_MS, fetchDistrictBoundaries).catch((err) => {
-  console.error("District boundaries warm-up fetch failed:", err.message);
-});
+// Warming the district-boundaries cache at startup (rather than making
+// whichever request happens to arrive first — possibly a real user opening
+// the map during a demo — wait 1-2+ minutes for the initial download) is
+// only meaningful for a real, long-lived process (local dev, Render,
+// Railway). It must NOT be a module-level side effect: this file is also
+// `require()`d by Vercel's build-time Express route-detection step, which
+// works by requiring the app's entrypoint in a short-lived subprocess and
+// waiting for it to exit cleanly. A fire-and-forget fetch kicked off the
+// instant this module loads leaves an open outbound connection for the
+// 1-2+ minutes the download takes — the subprocess never reaches Node's
+// natural "exit" event in time, gets force-killed before it can report any
+// routes back, and the whole deployment fails with a cryptic
+// "[JSON_PARSE] Error: expected value at line 1 column 1" (confirmed by
+// reproducing it locally: requiring this file left one open TCP handle,
+// and the process only exited once the deploy's build timeout killed it).
+// So this is exported, not run here — server.js (the actual long-lived
+// entrypoint, never touched by the Vercel introspection step, which
+// resolves to app.js because that's the file whose top-level code literally
+// calls `require("express")`) is the only thing that ever calls it.
+function warmDistrictBoundariesCache() {
+  return getCached("district-boundaries", DISTRICT_BOUNDARIES_CACHE_TTL_MS, fetchDistrictBoundaries).catch((err) => {
+    console.error("District boundaries warm-up fetch failed:", err.message);
+  });
+}
 
 // Express Router instances are just functions — attaching properties here
-// lets other modules (the water-level area-alert poller) reuse this exact
-// fetch+cache logic without a second HTTP round trip to this same server.
+// lets other modules (the water-level area-alert poller, server.js's own
+// startup warm-up) reuse this exact fetch+cache logic without a second HTTP
+// round trip to this same server.
 router.fetchWaterLevels = fetchWaterLevels;
 router.gaugeStatus = gaugeStatus;
 router.fetchReservoirs = fetchReservoirs;
+router.warmDistrictBoundariesCache = warmDistrictBoundariesCache;
 
 module.exports = router;
