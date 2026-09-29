@@ -36,6 +36,24 @@ export const DISTRICTS: District[] = [
   { name: "Kegalle", lat: 7.2513, lng: 80.3464 },
 ];
 
+// NBRO's own designated landslide-prone districts — static, not a live
+// feed. See web/src/lib/districts.ts's identical constant for the full
+// story of why (no live district-risk API exists; the one public ArcGIS
+// layer found is a stale, household-level resettlement registry, not
+// appropriate to publish).
+export const LANDSLIDE_PRONE_DISTRICTS = [
+  "Kalutara",
+  "Galle",
+  "Hambantota",
+  "Nuwara Eliya",
+  "Matale",
+  "Kandy",
+  "Kegalle",
+  "Ratnapura",
+  "Matara",
+  "Badulla",
+];
+
 function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;

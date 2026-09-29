@@ -1,6 +1,6 @@
 # API Integration Test Results
 
-Generated: 2026-09-28T18:54:04.512Z
+Generated: 2026-09-29T00:13:08.796Z
 Server: http://localhost:5000 (live, real HTTP calls — not mocked)
 
 ## Summary

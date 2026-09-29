@@ -9,6 +9,7 @@ import "@/lib/leafletIcons";
 import { apiFetch } from "@/lib/api";
 import { CountrySearchBox, type CountryFeature } from "@/components/CountrySearchBox";
 import { DistrictSearchBox, type DistrictOption } from "@/components/DistrictSearchBox";
+import { DISTRICTS, LANDSLIDE_PRONE_DISTRICTS } from "@/lib/districts";
 
 interface AreaStat {
   district: string;
@@ -207,6 +208,15 @@ const FLOOD_RISK_TIER: Record<string, SeverityTier> = {
 };
 const GDACS_TIER: Record<string, SeverityTier> = { Red: "danger", Orange: "caution", Green: "safe" };
 
+// Static hazard reference, not a live indicator — see LANDSLIDE_PRONE_DISTRICTS'
+// own comment in lib/districts.ts for the full "why not live" story. Amber
+// (the same "caution" hue used everywhere else on this map) for the 10
+// NBRO-designated districts, neutral gray for "no designation" — deliberately
+// not green/"safe", since the absence of a historical designation isn't a
+// safety claim.
+const LANDSLIDE_PRONE_COLOR = "#f59e0b";
+const LANDSLIDE_NONE_COLOR = "#9ca3af";
+
 /** One legend row: colored dot + tier icon + text label, always together. */
 function LegendItem({ color, tier, children }: { color: string; tier: SeverityTier; children: ReactNode }) {
   const Icon = TIER_ICON[tier];
@@ -233,7 +243,7 @@ function TierLabel({ tier, children }: { tier: SeverityTier; children: ReactNode
 const SRI_LANKA_CENTER: [number, number] = [7.8731, 80.7718];
 const REGIONAL_CENTER: [number, number] = [8, 87]; // zooms out to include the Sumatra subduction zone, for the earthquakes layer
 
-type ViewMode = "areas" | "gauges" | "reservoirs" | "floodRisk" | "gdacs" | "earthquakes";
+type ViewMode = "areas" | "gauges" | "reservoirs" | "floodRisk" | "landslide" | "gdacs" | "earthquakes";
 
 // react-leaflet's MapContainer only applies center/zoom on first mount —
 // this recenters the existing map instance when switching to the
@@ -488,6 +498,14 @@ export function AreaSeverityMap({
                     {t("severityMap.floodRiskTabLabel")}
                   </button>
                   <button
+                    onClick={() => setViewMode("landslide")}
+                    className={`rounded px-3 py-1.5 text-xs font-medium ${
+                      viewMode === "landslide" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+                    } border border-gray-300`}
+                  >
+                    {t("severityMap.landslideTabLabel")}
+                  </button>
+                  <button
                     onClick={() => setViewMode("gdacs")}
                     className={`rounded px-3 py-1.5 text-xs font-medium ${
                       viewMode === "gdacs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
@@ -555,6 +573,16 @@ export function AreaSeverityMap({
               {t(`severityMap.floodRisk${level.charAt(0).toUpperCase()}${level.slice(1)}`)}
             </LegendItem>
           ))}
+        {viewMode === "landslide" && (
+          <>
+            <LegendItem color={LANDSLIDE_PRONE_COLOR} tier="caution">
+              {t("severityMap.landslideProne")}
+            </LegendItem>
+            <LegendItem color={LANDSLIDE_NONE_COLOR} tier="unknown">
+              {t("severityMap.landslideNoDesignation")}
+            </LegendItem>
+          </>
+        )}
         {viewMode === "gdacs" &&
           Object.entries(GDACS_ALERT_COLOR).map(([level, color]) => (
             <LegendItem key={`gdacs-${level}`} color={color} tier={GDACS_TIER[level] ?? "unknown"}>
@@ -587,6 +615,7 @@ export function AreaSeverityMap({
       {viewMode === "floodRisk" && floodRiskLoaded && !floodRiskAvailable && (
         <p className="mb-3 text-sm text-gray-500">{t("severityMap.floodRiskUnavailable")}</p>
       )}
+      {viewMode === "landslide" && <p className="mb-3 text-xs text-gray-400">{t("severityMap.landslideCaption")}</p>}
       {viewMode === "gdacs" && gdacsLoaded && !gdacsFetching && gdacsEvents.length === 0 && (
         <div className="mb-3">
           <p className="text-sm text-gray-500">
@@ -753,6 +782,49 @@ export function AreaSeverityMap({
                   )}
                 </CircleMarker>
               ))}
+          {viewMode === "landslide" && boundaries && (
+            <GeoJSON
+              key="landslide-static"
+              data={boundaries}
+              style={(feature?: Feature<any, DistrictBoundaryProps>): PathOptions => {
+                const prone = LANDSLIDE_PRONE_DISTRICTS.includes(feature?.properties.district ?? "");
+                const color = prone ? LANDSLIDE_PRONE_COLOR : LANDSLIDE_NONE_COLOR;
+                return { color, weight: 1.2, fillColor: color, fillOpacity: prone ? 0.45 : 0.08 };
+              }}
+              onEachFeature={(feature: Feature<any, DistrictBoundaryProps>, layer: Layer) => {
+                if (!showPopups) return;
+                const prone = LANDSLIDE_PRONE_DISTRICTS.includes(feature.properties.district);
+                layer.bindPopup(
+                  `<strong>${feature.properties.district}</strong><br/>` +
+                    `${TIER_SYMBOL[prone ? "caution" : "unknown"]} ${
+                      prone ? t("severityMap.landslideProne") : t("severityMap.landslideNoDesignation")
+                    }`
+                );
+              }}
+            />
+          )}
+          {viewMode === "landslide" &&
+            !boundaries &&
+            LANDSLIDE_PRONE_DISTRICTS.map((name) => {
+              const d = DISTRICTS.find((x) => x.name === name);
+              if (!d) return null;
+              return (
+                <CircleMarker
+                  key={name}
+                  center={[d.lat, d.lng]}
+                  radius={10}
+                  pathOptions={{ color: LANDSLIDE_PRONE_COLOR, fillColor: LANDSLIDE_PRONE_COLOR, fillOpacity: 0.6 }}
+                >
+                  {showPopups && (
+                    <Popup>
+                      <strong>{name}</strong>
+                      <br />
+                      <TierLabel tier="caution">{t("severityMap.landslideProne")}</TierLabel>
+                    </Popup>
+                  )}
+                </CircleMarker>
+              );
+            })}
           {viewMode === "gauges" &&
             gauges.map((g) => (
               <CircleMarker

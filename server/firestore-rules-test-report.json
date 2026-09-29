@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-03T10:42:20.775Z",
-  "total": 44,
-  "passed": 44,
+  "generatedAt": "2026-09-29T00:27:41.841Z",
+  "total": 45,
+  "passed": 45,
   "failed": 0,
   "results": [
     {
@@ -120,11 +120,18 @@
       "pass": true
     },
     {
-      "name": "a completely unrelated victim (not the actual request's victim) can also read this delivery",
+      "name": "the request's own victim (via the linked requestId) reads the delivery",
       "expectation": "allow",
       "actual": 200,
       "pass": true,
-      "note": "REAL FINDING: the rule is `userRole() in [\"admin\",\"victim\"]`, not \"this delivery's own victim\" — ANY authenticated victim account can read ANY delivery document, not just the one tied to their own request. Flagged directly, not silently fixed — see the report notes."
+      "note": "FIXED: isOwningVictim() now checks the delivery's requestId resolves to a request owned by the caller, the same get()-based technique isOwningDonor() already used — this is the positive case the fix is meant to keep working."
+    },
+    {
+      "name": "a completely unrelated victim (not the actual request's victim) can no longer read this delivery",
+      "expectation": "deny",
+      "actual": 403,
+      "pass": true,
+      "note": "FIXED (previously a real finding): the rule used to be `userRole() in [\"admin\",\"victim\"]`, a role check not an ownership check, letting ANY authenticated victim account read ANY delivery document. Replaced with isOwningVictim() — confirmed here that an unrelated victim is now correctly denied."
     },
     {
       "name": "an unrelated volunteer (not assigned, not the owning donor) cannot read this delivery",

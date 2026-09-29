@@ -48,15 +48,21 @@ service cloud.firestore {
 
     // Deliveries: volunteers can read/update their own; the donor of a
     // self-delivery can read/update it; admins can read/write all;
-    // victims can read (to confirm) the delivery tied to their request.
+    // victims can read only the delivery tied to their own request (fixed —
+    // this used to be a bare `userRole() == "victim"` check with no
+    // ownership comparison, letting any victim read anyone's delivery doc).
     function isOwningDonor() {
       return get(/databases/$(database)/documents/donations/$(resource.data.donationId)).data.donorId == request.auth.uid;
+    }
+    function isOwningVictim() {
+      return get(/databases/$(database)/documents/aidRequests/$(resource.data.requestId)).data.victimId == request.auth.uid;
     }
 
     match /deliveries/{deliveryId} {
       allow create: if isSignedIn() && userRole() == "admin";
       allow read: if isSignedIn() &&
-                    (resource.data.volunteerId == request.auth.uid || userRole() in ["admin", "victim"] || isOwningDonor());
+                    (resource.data.volunteerId == request.auth.uid || userRole() == "admin" || isOwningDonor() ||
+                     (userRole() == "victim" && isOwningVictim()));
       allow update: if isSignedIn() &&
                       (resource.data.volunteerId == request.auth.uid || userRole() == "admin" || isOwningDonor());
     }

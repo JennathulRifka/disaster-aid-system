@@ -451,7 +451,11 @@
     "floodRiskHistorical": "Historically, {{pct}}% of years had a reported flood in this district this month",
     "floodRiskSimpleCaption": "Estimated flood risk by district this month, from rainfall and past floods.",
     "floodRiskCaption": "A trained model (logistic regression), not a guess: learned from {{startYear}}-{{endYear}} historical flood reports and rainfall data for Sri Lanka. Its riskiest-ranked district-months are about {{multiplier}}x more likely to have had a real flood than a random one — real signal, but this is a dissertation-scope model, not a certified forecasting system. Treat it as one input among many, not a guarantee.",
-    "floodRiskUnavailable": "The flood risk model is temporarily unavailable."
+    "floodRiskUnavailable": "The flood risk model is temporarily unavailable.",
+    "landslideTabLabel": "Landslide Risk",
+    "landslideProne": "Historically landslide-prone",
+    "landslideNoDesignation": "No designation",
+    "landslideCaption": "A static reference layer — Sri Lanka's 10 NBRO-designated landslide-prone districts. Not a live warning; check NBRO's own advisories for current conditions."
   },
   "categories": {
     "food": "Food",

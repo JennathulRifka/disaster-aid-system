@@ -5,7 +5,7 @@ import { geoJSON as leafletGeoJSON } from "leaflet";
 import "@/lib/leafletIcons";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { apiFetch } from "@/lib/api";
-import { DISTRICTS } from "@/lib/districts";
+import { DISTRICTS, LANDSLIDE_PRONE_DISTRICTS } from "@/lib/districts";
 import { CountrySearchBox, type CountryFeature } from "@/components/CountrySearchBox";
 import { DistrictSearchBox, type DistrictOption } from "@/components/DistrictSearchBox";
 
@@ -240,6 +240,11 @@ const FLOOD_RISK_LABEL: Record<string, string> = {
   high: "High risk",
 };
 
+// Static hazard reference, not a live indicator — see
+// LANDSLIDE_PRONE_DISTRICTS' own comment in lib/districts.ts.
+const LANDSLIDE_PRONE_COLOR = "#f59e0b";
+const LANDSLIDE_NONE_COLOR = "#9ca3af";
+
 const COMMUNITY_REPORT_TYPE_LABEL: Record<string, string> = {
   road_closure: "Road closure",
   water_level: "Water level / flooding",
@@ -255,7 +260,7 @@ const EARTHQUAKE_MAGNITUDE_LEGEND: [string, string][] = [
 // The 5 Sri-Lanka-focused tabs a district search applies to — distinct from
 // "gdacs"/"earthquakes", which search countries instead (a different data
 // domain, see CountrySearchBox.tsx).
-const LOCAL_DISTRICT_TABS: ViewMode[] = ["requests", "areas", "gauges", "reservoirs", "floodRisk"];
+const LOCAL_DISTRICT_TABS: ViewMode[] = ["requests", "areas", "gauges", "reservoirs", "floodRisk", "landslide"];
 
 // react-leaflet's MapContainer only sets center/zoom on first mount — this
 // recenters the existing map instance when the admin switches to the
@@ -347,7 +352,7 @@ const GAUGE_STATUS_LABEL: Record<string, string> = {
 const DONATION_COLOR = "#2563eb";
 const SRI_LANKA_CENTER: [number, number] = [7.8731, 80.7718];
 
-type ViewMode = "requests" | "areas" | "gauges" | "reservoirs" | "floodRisk" | "gdacs" | "earthquakes";
+type ViewMode = "requests" | "areas" | "gauges" | "reservoirs" | "floodRisk" | "landslide" | "gdacs" | "earthquakes";
 
 export default function SituationMap() {
   const [viewMode, setViewMode] = useState<ViewMode>("requests");
@@ -549,6 +554,14 @@ export default function SituationMap() {
             Flood Risk Forecast
           </button>
           <button
+            onClick={() => setViewMode("landslide")}
+            className={`rounded px-4 py-2 text-sm font-medium ${
+              viewMode === "landslide" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+            } border border-gray-300`}
+          >
+            Landslide Risk
+          </button>
+          <button
             onClick={() => setViewMode("gdacs")}
             className={`rounded px-4 py-2 text-sm font-medium ${
               viewMode === "gdacs" ? "bg-orange-600 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
@@ -646,6 +659,18 @@ export default function SituationMap() {
                   {FLOOD_RISK_LABEL[level]}
                 </div>
               ))}
+            {viewMode === "landslide" && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: LANDSLIDE_PRONE_COLOR }} />
+                  Historically landslide-prone
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: LANDSLIDE_NONE_COLOR }} />
+                  No designation
+                </div>
+              </>
+            )}
             {viewMode === "gdacs" &&
               Object.entries(GDACS_ALERT_LEAFLET_COLOR).map(([level, color]) => (
                 <div key={`gdacs-${level}`} className="flex items-center gap-1.5">
@@ -688,6 +713,14 @@ export default function SituationMap() {
           )}
           {viewMode === "floodRisk" && floodRiskLoaded && !floodRiskAvailable && (
             <p className="mb-4 text-sm text-gray-500">The flood risk model is temporarily unavailable.</p>
+          )}
+          {viewMode === "landslide" && (
+            <p className="mb-4 text-xs text-gray-400">
+              A static reference layer — Sri Lanka's 10 NBRO-designated landslide-prone districts (Landslide Hazard
+              Zonation Mapping programme). Not a live warning feed — NBRO's own current-condition advisories are only
+              published as narrative bulletins (Telegram/Facebook), not a structured API, so this can't be kept live;
+              check nbro.gov.lk directly for active warnings.
+            </p>
           )}
 
           {viewMode === "earthquakes" && (
@@ -900,6 +933,25 @@ export default function SituationMap() {
                       </Popup>
                     </CircleMarker>
                   ))}
+              {viewMode === "landslide" &&
+                LANDSLIDE_PRONE_DISTRICTS.map((name) => {
+                  const d = DISTRICTS.find((x) => x.name === name);
+                  if (!d) return null;
+                  return (
+                    <CircleMarker
+                      key={name}
+                      center={[d.lat, d.lng]}
+                      radius={11}
+                      pathOptions={{ color: LANDSLIDE_PRONE_COLOR, fillColor: LANDSLIDE_PRONE_COLOR, fillOpacity: 0.6 }}
+                    >
+                      <Popup>
+                        <strong>{name}</strong>
+                        <br />
+                        Historically landslide-prone (NBRO Landslide Hazard Zonation Mapping)
+                      </Popup>
+                    </CircleMarker>
+                  );
+                })}
               {(viewMode === "gdacs" || viewMode === "earthquakes") && selectedCountry && (
                 <GeoJSON
                   key={selectedCountry.properties.name}

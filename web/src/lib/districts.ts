@@ -39,6 +39,31 @@ export const DISTRICTS: District[] = [
   { name: "Kegalle", lat: 7.2513, lng: 80.3464 },
 ];
 
+// NBRO's own designated landslide-prone districts (Landslide Hazard Zonation
+// Mapping programme) — static, not a live feed. Confirmed by tracing NBRO's
+// public ArcGIS "Landslide Risk Information Portal" the same way this
+// project traced the Irrigation Department's dashboards: no live
+// district-level risk API exists (current warnings are only ever published
+// as narrative web/Telegram/Facebook posts, same PDF-only dead end as DMC's
+// situation reports), and the one genuinely public ArcGIS layer found there
+// turned out to be a household-level post-landslide resettlement registry —
+// stale (dated 2020) and inappropriate to publish (family sizes, tax
+// numbers, individual building footprints). This static 10-district list is
+// the honest alternative: a fixed reference layer, not a "risk right now"
+// indicator, labeled as such wherever it's shown.
+export const LANDSLIDE_PRONE_DISTRICTS = [
+  "Kalutara",
+  "Galle",
+  "Hambantota",
+  "Nuwara Eliya",
+  "Matale",
+  "Kandy",
+  "Kegalle",
+  "Ratnapura",
+  "Matara",
+  "Badulla",
+];
+
 function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;

@@ -162,7 +162,8 @@ async function main() {
         method: "POST",
         body: JSON.stringify({
           category: "water",
-          quantity: 2,
+          quantity: "2 bottles",
+          quantityValue: 2,
           location: randomLocation(),
           deliveryMethod: "volunteer",
           notes: "load test",
@@ -216,18 +217,26 @@ async function main() {
   // different delivery, all at the same instant) ----
   const acceptable = createdDocs.deliveries.slice(0, volunteers.length);
   console.log(`--- Phase 4: ${acceptable.length} volunteers accepting deliveries concurrently ---`);
-  // Deliveries were auto-assigned by the nearest-volunteer algorithm at
-  // match time — look up who each one actually belongs to before accepting.
-  const deliveryDocs = await db.getAll(...acceptable.map((id) => db.collection("deliveries").doc(id)));
-  const acceptResults = await Promise.all(
-    deliveryDocs.map((doc) => {
-      if (!doc.exists) return Promise.resolve({ ok: false, ms: 0, status: 0, error: "delivery not found" });
-      const assignedVolunteer = volunteers.find((v) => v.uid === doc.data().volunteerId);
-      if (!assignedVolunteer) return Promise.resolve({ ok: false, ms: 0, status: 0, error: "no matching volunteer" });
-      return timedFetch(`/api/deliveries/${doc.id}/accept`, assignedVolunteer.token, { method: "PATCH" });
-    })
-  );
-  console.log(JSON.stringify(stats(acceptResults), null, 2), "\n");
+  if (acceptable.length === 0) {
+    // Firestore's getAll() throws on zero arguments rather than returning an
+    // empty array — guard explicitly instead of letting an upstream phase
+    // producing no deliveries (a failed match phase, or genuinely nobody
+    // qualifying for auto-assignment) crash the whole run here.
+    console.log("  Skipped — no deliveries were created in Phase 3 to accept.\n");
+  } else {
+    // Deliveries were auto-assigned by the nearest-volunteer algorithm at
+    // match time — look up who each one actually belongs to before accepting.
+    const deliveryDocs = await db.getAll(...acceptable.map((id) => db.collection("deliveries").doc(id)));
+    const acceptResults = await Promise.all(
+      deliveryDocs.map((doc) => {
+        if (!doc.exists) return Promise.resolve({ ok: false, ms: 0, status: 0, error: "delivery not found" });
+        const assignedVolunteer = volunteers.find((v) => v.uid === doc.data().volunteerId);
+        if (!assignedVolunteer) return Promise.resolve({ ok: false, ms: 0, status: 0, error: "no matching volunteer" });
+        return timedFetch(`/api/deliveries/${doc.id}/accept`, assignedVolunteer.token, { method: "PATCH" });
+      })
+    );
+    console.log(JSON.stringify(stats(acceptResults), null, 2), "\n");
+  }
 
   // ---- Phase 5: read-heavy burst ----
   console.log(`--- Phase 5: ${READ_BURST_COUNT} concurrent reads (mixed GET endpoints) ---`);
@@ -251,7 +260,23 @@ async function main() {
 
 main()
   .then(() => process.exit(0))
-  .catch((err) => {
+  .catch(async (err) => {
     console.error("Load test failed:", err);
+    // Real accounts/documents were already created by this point — clean up
+    // on failure too, not just on success, same convention already used by
+    // test-firestore-rules.js/test-api-integration.js's own catch handlers.
+    // Without this, a crash mid-run silently leaves real throwaway accounts
+    // behind (confirmed the hard way — a prior run without this handler left
+    // 152 stray accounts + 60 stray requests sitting in the live database).
+    try {
+      await Promise.all(createdDocs.deliveries.map((id) => db.collection("deliveries").doc(id).delete().catch(() => {})));
+      await Promise.all(createdDocs.donations.map((id) => db.collection("donations").doc(id).delete().catch(() => {})));
+      await Promise.all(createdDocs.aidRequests.map((id) => db.collection("aidRequests").doc(id).delete().catch(() => {})));
+      await Promise.all(createdUids.map((uid) => db.collection("users").doc(uid).delete().catch(() => {})));
+      if (createdUids.length) await auth.deleteUsers(createdUids);
+      console.error(`Cleaned up ${createdUids.length} accounts and their documents after the failure.`);
+    } catch (cleanupErr) {
+      console.error("Cleanup after failure also failed — manual check needed:", cleanupErr.message);
+    }
     process.exit(1);
   });

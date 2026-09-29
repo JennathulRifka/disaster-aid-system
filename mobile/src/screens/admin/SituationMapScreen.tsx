@@ -9,6 +9,7 @@ import { dotImage } from "../../lib/markerDots";
 import { DistrictSearchBox, type DistrictOption } from "../../components/DistrictSearchBox";
 import { CountrySearchBox, type CountryFeature } from "../../components/CountrySearchBox";
 import { regionForGeometry } from "../../lib/geoBounds";
+import { DISTRICTS, LANDSLIDE_PRONE_DISTRICTS } from "../../lib/districts";
 
 interface SelectedMarker {
   title: string;
@@ -218,6 +219,10 @@ const FLOOD_RISK_LABEL: Record<string, string> = {
   elevated: "Elevated risk",
   high: "High risk",
 };
+// Static hazard reference, not a live indicator — see
+// LANDSLIDE_PRONE_DISTRICTS' own comment in lib/districts.ts.
+const LANDSLIDE_PRONE_COLOR = "#f59e0b";
+const LANDSLIDE_NONE_COLOR = "#9ca3af";
 
 const SRI_LANKA_REGION = { latitude: 7.8731, longitude: 80.7718, latitudeDelta: 3.2, longitudeDelta: 3.2 };
 const REGIONAL_REGION = { latitude: 8, longitude: 87, latitudeDelta: 20, longitudeDelta: 20 };
@@ -237,7 +242,7 @@ function ColorDot({ color, size = 16 }: { color: string; size?: number }) {
   );
 }
 
-type ViewMode = "requests" | "areas" | "gauges" | "reservoirs" | "gdacs" | "earthquakes" | "floodRisk";
+type ViewMode = "requests" | "areas" | "gauges" | "reservoirs" | "gdacs" | "earthquakes" | "floodRisk" | "landslide";
 
 const TABS: { key: ViewMode; label: string }[] = [
   { key: "requests", label: "Requests" },
@@ -247,12 +252,13 @@ const TABS: { key: ViewMode; label: string }[] = [
   { key: "gdacs", label: "Global Alerts" },
   { key: "earthquakes", label: "Tsunami Risk" },
   { key: "floodRisk", label: "Flood Risk" },
+  { key: "landslide", label: "Landslide Risk" },
 ];
 
-// The 5 Sri-Lanka-focused tabs get district search; GDACS/Earthquakes (world
+// The 6 Sri-Lanka-focused tabs get district search; GDACS/Earthquakes (world
 // data) get country search instead — same split web's admin map already
 // uses (two different search boxes for two different data domains).
-const LOCAL_TABS = new Set<ViewMode>(["requests", "areas", "gauges", "reservoirs", "floodRisk"]);
+const LOCAL_TABS = new Set<ViewMode>(["requests", "areas", "gauges", "reservoirs", "floodRisk", "landslide"]);
 
 function legendFor(viewMode: ViewMode): [string, string][] {
   switch (viewMode) {
@@ -276,6 +282,11 @@ function legendFor(viewMode: ViewMode): [string, string][] {
       return EARTHQUAKE_LEGEND;
     case "floodRisk":
       return Object.entries(FLOOD_RISK_LABEL).map(([k, label]) => [label, FLOOD_RISK_COLOR[k]]);
+    case "landslide":
+      return [
+        ["Historically landslide-prone", LANDSLIDE_PRONE_COLOR],
+        ["No designation", LANDSLIDE_NONE_COLOR],
+      ];
   }
 }
 
@@ -369,7 +380,7 @@ export function SituationMapScreen() {
   // markers below stay as the fallback for as long as boundaries hasn't
   // loaded.
   useEffect(() => {
-    if (viewMode === "floodRisk" && !boundariesLoaded) {
+    if ((viewMode === "floodRisk" || viewMode === "landslide") && !boundariesLoaded) {
       apiFetch("/api/external/district-boundaries")
         .then((data) => setBoundaries(data))
         .catch(() => setBoundaries(null))
@@ -407,6 +418,23 @@ export function SituationMapScreen() {
       }),
     };
   }, [boundaries, floodRisk]);
+
+  // Static, unlike floodRiskGeojson above — no live data to match against,
+  // just a fixed membership check against LANDSLIDE_PRONE_DISTRICTS.
+  const landslideGeojson = useMemo(() => {
+    if (!boundaries) return null;
+    return {
+      type: "FeatureCollection" as const,
+      features: boundaries.features.map((feature) => {
+        const prone = LANDSLIDE_PRONE_DISTRICTS.includes(feature.properties.district);
+        const color = prone ? LANDSLIDE_PRONE_COLOR : LANDSLIDE_NONE_COLOR;
+        return {
+          ...feature,
+          properties: { ...feature.properties, fill: color, "fill-opacity": prone ? 0.45 : 0.08, stroke: color, "stroke-width": 1.2 },
+        };
+      }),
+    };
+  }, [boundaries]);
 
   useEffect(() => {
     if (viewMode !== "gdacs") return;
@@ -747,6 +775,39 @@ export function SituationMapScreen() {
                   }
                 />
               ))}
+            {viewMode === "landslide" && landslideGeojson && (
+              <Geojson
+                key="landslide-static"
+                geojson={landslideGeojson as unknown as Parameters<typeof Geojson>[0]["geojson"]}
+                strokeWidth={1.2}
+                tappable
+                onPress={(event) => {
+                  const feature = event.feature as unknown as DistrictBoundaryFeature | undefined;
+                  const district = feature?.properties?.district;
+                  if (!district) return;
+                  const prone = LANDSLIDE_PRONE_DISTRICTS.includes(district);
+                  setSelected({
+                    title: district,
+                    lines: [prone ? "Historically landslide-prone" : "No designation"],
+                  });
+                }}
+              />
+            )}
+            {viewMode === "landslide" &&
+              !landslideGeojson &&
+              LANDSLIDE_PRONE_DISTRICTS.map((name) => {
+                const d = DISTRICTS.find((x) => x.name === name);
+                if (!d) return null;
+                return (
+                  <Marker
+                    key={name}
+                    coordinate={{ latitude: d.lat, longitude: d.lng }}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                    image={dotImage(LANDSLIDE_PRONE_COLOR, 18)}
+                    onPress={() => setSelected({ title: name, lines: ["Historically landslide-prone"] })}
+                  />
+                );
+              })}
             {(viewMode === "gdacs" || viewMode === "earthquakes") && selectedCountry && (
               // Violet — deliberately a color no risk/alert-level palette on
               // this map already uses (green/amber/orange/red are all taken),

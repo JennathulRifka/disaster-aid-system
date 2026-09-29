@@ -136,7 +136,7 @@ async function main() {
 
   const requestId = await createDoc("aidRequests", { victimId: victim1.uid, status: "pending", items: [] });
   const donationId = await createDoc("donations", { donorId: donor1.uid, category: "food", status: "available" });
-  const deliveryId = await createDoc("deliveries", { volunteerId: volunteer1.uid, donationId, status: "accepted" });
+  const deliveryId = await createDoc("deliveries", { requestId, volunteerId: volunteer1.uid, donationId, status: "accepted" });
   const sosId = await createDoc("sosRequests", { reporterId: victim1.uid, type: "trapped", status: "pending" });
   const caseNoteId = await createDoc("caseNotes", { requestId, authorId: admin1.uid, text: "test note" });
   const broadcastId = await createDoc("broadcasts", { message: "test", severity: "info", active: true });
@@ -186,15 +186,21 @@ async function main() {
   record("non-admin cannot write a donation directly", "deny", (await firestorePatch("donations", donationId, donor1.token)).status);
 
   // ---- deliveries/{deliveryId} ----
-  console.log("\n4. deliveries/{deliveryId} — assigned volunteer, owning donor, admin, or (per the rule) ANY victim");
+  console.log("\n4. deliveries/{deliveryId} — assigned volunteer, owning donor, admin, or the linked request's own victim");
   record("assigned volunteer reads own delivery", "allow", (await firestoreGet("deliveries", deliveryId, volunteer1.token)).status);
   record("the owning donor (via the linked donation) reads the delivery", "allow", (await firestoreGet("deliveries", deliveryId, donor1.token)).status);
   record("admin reads any delivery", "allow", (await firestoreGet("deliveries", deliveryId, admin1.token)).status);
   record(
-    "a completely unrelated victim (not the actual request's victim) can also read this delivery",
+    "the request's own victim (via the linked requestId) reads the delivery",
     "allow",
+    (await firestoreGet("deliveries", deliveryId, victim1.token)).status,
+    "FIXED: isOwningVictim() now checks the delivery's requestId resolves to a request owned by the caller, the same get()-based technique isOwningDonor() already used — this is the positive case the fix is meant to keep working."
+  );
+  record(
+    "a completely unrelated victim (not the actual request's victim) can no longer read this delivery",
+    "deny",
     (await firestoreGet("deliveries", deliveryId, victim2.token)).status,
-    "REAL FINDING: the rule is `userRole() in [\"admin\",\"victim\"]`, not \"this delivery's own victim\" — ANY authenticated victim account can read ANY delivery document, not just the one tied to their own request. Flagged directly, not silently fixed — see the report notes."
+    "FIXED (previously a real finding): the rule used to be `userRole() in [\"admin\",\"victim\"]`, a role check not an ownership check, letting ANY authenticated victim account read ANY delivery document. Replaced with isOwningVictim() — confirmed here that an unrelated victim is now correctly denied."
   );
   record("an unrelated volunteer (not assigned, not the owning donor) cannot read this delivery", "deny", (await firestoreGet("deliveries", deliveryId, (await createAccount("volunteer")).token)).status);
 

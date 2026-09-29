@@ -8,6 +8,7 @@ import { dotImage } from "../lib/markerDots";
 import { DistrictSearchBox, type DistrictOption } from "./DistrictSearchBox";
 import { CountrySearchBox, type CountryFeature } from "./CountrySearchBox";
 import { regionForGeometry } from "../lib/geoBounds";
+import { DISTRICTS, LANDSLIDE_PRONE_DISTRICTS } from "../lib/districts";
 
 interface SelectedMarker {
   title: string;
@@ -163,6 +164,10 @@ const FLOOD_RISK_COLOR: Record<string, string> = {
   elevated: "#f97316",
   high: "#dc2626",
 };
+// Static hazard reference, not a live indicator — see
+// LANDSLIDE_PRONE_DISTRICTS' own comment in lib/districts.ts.
+const LANDSLIDE_PRONE_COLOR = "#f59e0b";
+const LANDSLIDE_NONE_COLOR = "#9ca3af";
 function floodRiskLabel(t: TFunction): Record<string, string> {
   return {
     low: t("severityMap.floodRiskLow"),
@@ -190,12 +195,12 @@ function ColorDot({ color, size = 16 }: { color: string; size?: number }) {
   );
 }
 
-type ViewMode = "areas" | "gauges" | "reservoirs" | "gdacs" | "earthquakes" | "floodRisk";
+type ViewMode = "areas" | "gauges" | "reservoirs" | "gdacs" | "earthquakes" | "floodRisk" | "landslide";
 
-// The 4 Sri-Lanka-focused tabs get district search; GDACS/Earthquakes (world
+// The 5 Sri-Lanka-focused tabs get district search; GDACS/Earthquakes (world
 // data) get country search instead — same split web's AreaSeverityMap.tsx
 // already uses.
-const LOCAL_TABS = new Set<ViewMode>(["areas", "gauges", "reservoirs", "floodRisk"]);
+const LOCAL_TABS = new Set<ViewMode>(["areas", "gauges", "reservoirs", "floodRisk", "landslide"]);
 
 function tabsFor(t: TFunction): { key: ViewMode; label: string }[] {
   return [
@@ -205,6 +210,7 @@ function tabsFor(t: TFunction): { key: ViewMode; label: string }[] {
     { key: "gdacs", label: t("severityMap.gdacsTab") },
     { key: "earthquakes", label: t("severityMap.earthquakesTab") },
     { key: "floodRisk", label: t("severityMap.floodRiskTab") },
+    { key: "landslide", label: t("severityMap.landslideTab") },
   ];
 }
 
@@ -230,6 +236,11 @@ function legendFor(viewMode: ViewMode, t: TFunction): [string, string][] {
       return EARTHQUAKE_LEGEND;
     case "floodRisk":
       return Object.entries(floodRiskLabel(t)).map(([k, label]) => [label, FLOOD_RISK_COLOR[k]]);
+    case "landslide":
+      return [
+        [t("severityMap.landslideProne"), LANDSLIDE_PRONE_COLOR],
+        [t("severityMap.landslideNoDesignation"), LANDSLIDE_NONE_COLOR],
+      ];
   }
 }
 
@@ -305,7 +316,7 @@ export function AreaSeverityMap({ height = 420 }: { height?: number }) {
   // tab, never break it: the existing dot markers below stay as the
   // fallback for as long as boundaries hasn't loaded.
   useEffect(() => {
-    if (viewMode === "floodRisk" && !boundariesLoaded) {
+    if ((viewMode === "floodRisk" || viewMode === "landslide") && !boundariesLoaded) {
       apiFetch("/api/external/district-boundaries")
         .then((data) => setBoundaries(data))
         .catch(() => setBoundaries(null))
@@ -343,6 +354,24 @@ export function AreaSeverityMap({ height = 420 }: { height?: number }) {
       }),
     };
   }, [boundaries, floodRisk]);
+
+  // Static, unlike floodRiskGeojson above — no live data to match against,
+  // just a fixed membership check. Recomputes only when boundaries itself
+  // loads.
+  const landslideGeojson = useMemo(() => {
+    if (!boundaries) return null;
+    return {
+      type: "FeatureCollection" as const,
+      features: boundaries.features.map((feature) => {
+        const prone = LANDSLIDE_PRONE_DISTRICTS.includes(feature.properties.district);
+        const color = prone ? LANDSLIDE_PRONE_COLOR : LANDSLIDE_NONE_COLOR;
+        return {
+          ...feature,
+          properties: { ...feature.properties, fill: color, "fill-opacity": prone ? 0.45 : 0.08, stroke: color, "stroke-width": 1.2 },
+        };
+      }),
+    };
+  }, [boundaries]);
 
   useEffect(() => {
     if (viewMode !== "gdacs") return;
@@ -466,6 +495,9 @@ export function AreaSeverityMap({ height = 420 }: { height?: number }) {
       )}
       {viewMode === "floodRisk" && (
         <Text className="mb-2 text-xs text-gray-400">{t("severityMap.floodRiskCaption")}</Text>
+      )}
+      {viewMode === "landslide" && (
+        <Text className="mb-2 text-xs text-gray-400">{t("severityMap.landslideCaption")}</Text>
       )}
 
       {loading ? (
@@ -652,6 +684,39 @@ export function AreaSeverityMap({ height = 420 }: { height?: number }) {
                   }
                 />
               ))}
+            {viewMode === "landslide" && landslideGeojson && (
+              <Geojson
+                key="landslide-static"
+                geojson={landslideGeojson as unknown as Parameters<typeof Geojson>[0]["geojson"]}
+                strokeWidth={1.2}
+                tappable
+                onPress={(event) => {
+                  const feature = event.feature as unknown as DistrictBoundaryFeature | undefined;
+                  const district = feature?.properties?.district;
+                  if (!district) return;
+                  const prone = LANDSLIDE_PRONE_DISTRICTS.includes(district);
+                  setSelected({
+                    title: district,
+                    lines: [prone ? t("severityMap.landslideProne") : t("severityMap.landslideNoDesignation")],
+                  });
+                }}
+              />
+            )}
+            {viewMode === "landslide" &&
+              !landslideGeojson &&
+              LANDSLIDE_PRONE_DISTRICTS.map((name) => {
+                const d = DISTRICTS.find((x) => x.name === name);
+                if (!d) return null;
+                return (
+                  <Marker
+                    key={name}
+                    coordinate={{ latitude: d.lat, longitude: d.lng }}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                    image={dotImage(LANDSLIDE_PRONE_COLOR, 18)}
+                    onPress={() => setSelected({ title: name, lines: [t("severityMap.landslideProne")] })}
+                  />
+                );
+              })}
             {(viewMode === "gdacs" || viewMode === "earthquakes") && selectedCountry && (
               // Violet — deliberately a color no risk/alert-level palette on
               // this map already uses, so a searched country's highlight is
