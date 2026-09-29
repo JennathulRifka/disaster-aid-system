@@ -4,7 +4,22 @@ const AdmZip = require("adm-zip");
 const simplify = require("@turf/simplify").default;
 const Papa = require("papaparse");
 const topojson = require("topojson-client");
-const worldCountriesTopo = require("world-atlas/countries-110m.json");
+// A local copy of world-atlas's countries-110m.json (Natural Earth 110m
+// admin-0 data, public domain), not a deep require into the world-atlas
+// package itself. Deliberately: `require("world-atlas/countries-110m.json")`
+// builds fine with plain Node, but breaks Vercel's build — that package has
+// no "main"/"exports" field at all (it's just a folder of data files), and
+// its combination with a bare-specifier JSON deep-import is exactly what
+// trips up Vercel's rolldown-based bundler, failing the whole deploy with a
+// generic "[JSON_PARSE] Error: expected value at line 1 column 1" that gives
+// no hint it's this file — confirmed by bisecting route-by-route and then
+// require-by-require until stubbing out just this one line fixed the build.
+// A same-directory relative require of our own copy sidesteps the bug
+// entirely and matches this project's existing convention of keeping data
+// files in src/data/ (see desinventar-flood-records.json,
+// flood-risk-model.json). world-atlas itself is no longer a dependency —
+// this file is the only thing that ever used it.
+const worldCountriesTopo = require("../data/countries-110m.json");
 const { getCached, invalidate } = require("../utils/cache");
 const { DISTRICTS, nearestDistrict } = require("../utils/districts");
 const { predictAllDistricts, isModelAvailable, getModelMeta, reloadModel } = require("../utils/floodPrediction");
