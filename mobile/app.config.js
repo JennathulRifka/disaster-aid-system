@@ -4,8 +4,14 @@
 // auto-loads .env before evaluating this file for local commands (expo
 // start, expo prebuild) - no dotenv require needed. EAS Build's cloud
 // environment does NOT read local .env files though - GOOGLE_MAPS_API_KEY
-// needs to be registered separately via `eas env:create` before the next
-// cloud build that includes react-native-maps.
+// and GOOGLE_SERVICES_JSON (a file-type variable) are both registered on
+// EAS itself (`eas env:create`/`eas env:set`) for exactly this reason.
+// google-services.json is gitignored (it's a real Firebase credential) and
+// EAS Build only uploads what's tracked in git, so a cloud build can't see
+// the local file at all - GOOGLE_SERVICES_JSON resolves to a temp path EAS
+// downloads it to during the build; the literal "./google-services.json"
+// fallback is what local commands and `expo prebuild` still use, since the
+// real file is genuinely present on disk there.
 module.exports = {
   expo: {
     name: "mobile",
@@ -23,7 +29,7 @@ module.exports = {
     },
     android: {
       package: "com.disasteraidsystem.mobile",
-      googleServicesFile: "./google-services.json",
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON || "./google-services.json",
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/android-icon-foreground.png",
