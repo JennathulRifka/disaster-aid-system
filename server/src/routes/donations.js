@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const { findBestVolunteer, findVolunteerForDropoff, findVolunteerForRequest } = require("../utils/autoAssignVolunteer");
 const { createChatForSelfDelivery } = require("../utils/deliveryChats");
 const { sendNotificationToUser } = require("../utils/notifications");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -77,7 +78,7 @@ router.post("/", requireAuth, requireRole("donor"), async (req, res) => {
     const docRef = await db.collection("donations").add(donation);
     return res.status(201).json({ id: docRef.id, ...donation });
   } catch (err) {
-    console.error("Create donation error:", err.message);
+    logger.error({ err }, "Create donation error");
     return res.status(500).json({ error: "Failed to create donation.", details: err.message });
   }
 });
@@ -174,7 +175,7 @@ router.post("/batch", requireAuth, requireRole("donor"), async (req, res) => {
     await batch.commit();
     return res.status(201).json({ dropoffId, donations: created });
   } catch (err) {
-    console.error("Create donation batch error:", err.message);
+    logger.error({ err }, "Create donation batch error");
     return res.status(500).json({ error: "Failed to create donations.", details: err.message });
   }
 });
@@ -191,7 +192,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
     const donations = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json(donations);
   } catch (err) {
-    console.error("List donations error:", err.message);
+    logger.error({ err }, "List donations error");
     return res.status(500).json({ error: "Failed to list donations.", details: err.message });
   }
 });
@@ -206,7 +207,7 @@ router.get("/mine", requireAuth, requireRole("donor"), async (req, res) => {
     const donations = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json(donations);
   } catch (err) {
-    console.error("List my donations error:", err.message);
+    logger.error({ err }, "List my donations error");
     return res.status(500).json({ error: "Failed to list your donations.", details: err.message });
   }
 });
@@ -423,7 +424,7 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
       remainingQuantity: remainingAfter,
     });
   } catch (err) {
-    console.error("Match donation error:", err.message);
+    logger.error({ err }, "Match donation error");
     return res.status(500).json({ error: "Failed to match donation.", details: err.message });
   }
 });

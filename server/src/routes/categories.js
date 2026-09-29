@@ -2,6 +2,7 @@ const express = require("express");
 const { db } = require("../config/firebase");
 const { requireAuth, requireRole } = require("../middleware/authMiddleware");
 const { getCategoryLimits } = require("../utils/categories");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 const COLLECTION = "categoryLimits";
@@ -24,7 +25,7 @@ router.get("/", requireAuth, async (req, res) => {
     const limits = await getCategoryLimits();
     return res.json(limits);
   } catch (err) {
-    console.error("List categories error:", err.message);
+    logger.error({ err }, "List categories error");
     return res.status(500).json({ error: "Failed to load categories.", details: err.message });
   }
 });
@@ -60,7 +61,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
 
     return res.status(201).json({ key, ...category });
   } catch (err) {
-    console.error("Create category error:", err.message);
+    logger.error({ err }, "Create category error");
     return res.status(500).json({ error: "Failed to create category.", details: err.message });
   }
 });
@@ -91,7 +92,7 @@ router.patch("/:key", requireAuth, requireRole("admin"), async (req, res) => {
     await ref.update(update);
     return res.json({ key: req.params.key, ...doc.data(), ...update });
   } catch (err) {
-    console.error("Update category error:", err.message);
+    logger.error({ err }, "Update category error");
     return res.status(500).json({ error: "Failed to update category.", details: err.message });
   }
 });

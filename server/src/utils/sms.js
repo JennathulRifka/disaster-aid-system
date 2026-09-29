@@ -1,5 +1,6 @@
 const { db } = require("../config/firebase");
 const { normalizeSriLankanPhone } = require("./phone");
+const { logger } = require("./logger");
 
 const TEXTLK_SEND_URL = "https://app.text.lk/api/v3/sms/send";
 
@@ -19,7 +20,7 @@ async function sendSmsToUser(uid, message) {
   try {
     const apiToken = process.env.TEXTLK_API_TOKEN;
     if (!apiToken) {
-      console.log("SMS skipped (TEXTLK_API_TOKEN not set):", message);
+      logger.info({ message }, "SMS skipped: TEXTLK_API_TOKEN not set");
       return;
     }
 
@@ -44,10 +45,10 @@ async function sendSmsToUser(uid, message) {
 
     const data = await res.json().catch(() => null);
     if (!res.ok || data?.status !== "success") {
-      console.error(`SMS send failed for user ${uid}:`, data?.message || res.status);
+      logger.error({ uid, reason: data?.message || res.status }, "SMS send failed");
     }
   } catch (err) {
-    console.error(`SMS send failed for user ${uid}:`, err.message);
+    logger.error({ err, uid }, "SMS send failed");
   }
 }
 

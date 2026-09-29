@@ -14,6 +14,7 @@
 const fs = require("fs");
 const path = require("path");
 const { DISTRICTS } = require("./districts");
+const { logger } = require("./logger");
 
 const MODEL_PATH = path.join(__dirname, "../data/flood-risk-model.json");
 let model = null;
@@ -22,11 +23,9 @@ function loadModel() {
   try {
     model = JSON.parse(fs.readFileSync(MODEL_PATH, "utf8"));
   } catch (err) {
-    console.error(
-      "Flood risk model not found or unreadable at",
-      MODEL_PATH,
-      "- run `node scripts/train-flood-risk-model.js` from server/, or use the admin \"Retrain model\" button. Predictions will be unavailable until then.",
-      err.message
+    logger.error(
+      { err, modelPath: MODEL_PATH },
+      'Flood risk model not found or unreadable - run `node scripts/train-flood-risk-model.js` from server/, or use the admin "Retrain model" button. Predictions will be unavailable until then.'
     );
   }
 }

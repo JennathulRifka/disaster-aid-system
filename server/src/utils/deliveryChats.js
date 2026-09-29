@@ -1,5 +1,6 @@
 const { db } = require("../config/firebase");
 const { sendNotificationToUser } = require("./notifications");
+const { logger } = require("./logger");
 
 // One chat per (delivery, pair) — a volunteer-delivery has two independent
 // chats (donor<->volunteer to coordinate pickup, volunteer<->victim to
@@ -104,7 +105,7 @@ async function createChatsForAcceptedDelivery(delivery, deliveryId, handoffVersi
       createChat(deliveryId, delivery.requestId, delivery.donationId, PAIR_KEYS.VOLUNTEER_VICTIM, delivery.volunteerId, "volunteer", victimId, "victim", handoffVersion),
     ]);
   } catch (err) {
-    console.error(`Failed to create chats for accepted delivery ${deliveryId}:`, err.message);
+    logger.error({ err, deliveryId }, "Failed to create chats for accepted delivery");
   }
 }
 
@@ -117,7 +118,7 @@ async function createChatForSelfDelivery(deliveryId, requestId, donationId, dono
   try {
     await createChat(deliveryId, requestId, donationId, PAIR_KEYS.DONOR_VICTIM, donorId, "donor", victimId, "victim");
   } catch (err) {
-    console.error(`Failed to create chat for self-delivery ${deliveryId}:`, err.message);
+    logger.error({ err, deliveryId }, "Failed to create chat for self-delivery");
   }
 }
 
@@ -134,7 +135,7 @@ async function lockChatsForDelivery(deliveryId) {
     const now = new Date().toISOString();
     await Promise.all(snapshot.docs.map((doc) => doc.ref.update({ status: "locked", updatedAt: now })));
   } catch (err) {
-    console.error(`Failed to lock chats for delivery ${deliveryId}:`, err.message);
+    logger.error({ err, deliveryId }, "Failed to lock chats for delivery");
   }
 }
 

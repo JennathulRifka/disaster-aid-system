@@ -1,6 +1,7 @@
 const express = require("express");
 const { db } = require("../config/firebase");
 const { requireAuth, requireRole } = require("../middleware/authMiddleware");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 const COLLECTION = "broadcasts";
@@ -18,7 +19,7 @@ router.get("/active", async (req, res) => {
     const doc = snapshot.docs[0];
     return res.json({ id: doc.id, ...doc.data() });
   } catch (err) {
-    console.error("Get active broadcast error:", err.message);
+    logger.error({ err }, "Get active broadcast error");
     return res.status(500).json({ error: "Failed to load active broadcast.", details: err.message });
   }
 });
@@ -33,7 +34,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
     const broadcasts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json(broadcasts);
   } catch (err) {
-    console.error("List broadcasts error:", err.message);
+    logger.error({ err }, "List broadcasts error");
     return res.status(500).json({ error: "Failed to list broadcasts.", details: err.message });
   }
 });
@@ -80,7 +81,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
 
     return res.status(201).json({ id: ref.id, ...broadcast });
   } catch (err) {
-    console.error("Create broadcast error:", err.message);
+    logger.error({ err }, "Create broadcast error");
     return res.status(500).json({ error: "Failed to create broadcast.", details: err.message });
   }
 });
@@ -99,7 +100,7 @@ router.patch("/:id/deactivate", requireAuth, requireRole("admin"), async (req, r
     await ref.update({ active: false, deactivatedAt: now, updatedAt: now });
     return res.json({ id: req.params.id, ...doc.data(), active: false, deactivatedAt: now, updatedAt: now });
   } catch (err) {
-    console.error("Deactivate broadcast error:", err.message);
+    logger.error({ err }, "Deactivate broadcast error");
     return res.status(500).json({ error: "Failed to deactivate broadcast.", details: err.message });
   }
 });

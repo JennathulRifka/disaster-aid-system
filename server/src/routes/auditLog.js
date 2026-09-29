@@ -1,6 +1,7 @@
 const express = require("express");
 const { db } = require("../config/firebase");
 const { requireAuth, requireRole } = require("../middleware/authMiddleware");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
     const entries = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json(entries);
   } catch (err) {
-    console.error("List audit log error:", err.message);
+    logger.error({ err }, "List audit log error");
     return res.status(500).json({ error: "Failed to list audit log.", details: err.message });
   }
 });

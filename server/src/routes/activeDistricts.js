@@ -5,6 +5,7 @@ const { DISTRICTS } = require("../utils/districts");
 const { logAction } = require("../utils/auditLog");
 const { findVictimsInDistrict } = require("../utils/waterLevelAlerts");
 const { sendNotificationToUser } = require("../utils/notifications");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 const COLLECTION = "activeDistricts";
@@ -74,7 +75,7 @@ router.get("/", async (req, res) => {
     const districts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json(districts);
   } catch (err) {
-    console.error("List active districts error:", err.message);
+    logger.error({ err }, "List active districts error");
     return res.status(500).json({ error: "Failed to list active districts.", details: err.message });
   }
 });
@@ -111,7 +112,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
 
     return res.status(201).json({ ...record, notifiedCount });
   } catch (err) {
-    console.error("Activate district error:", err.message);
+    logger.error({ err }, "Activate district error");
     return res.status(500).json({ error: "Failed to activate district.", details: err.message });
   }
 });
@@ -133,7 +134,7 @@ router.delete("/:district", requireAuth, requireRole("admin"), async (req, res) 
 
     return res.json({ district: doc.data().district, active: false });
   } catch (err) {
-    console.error("Deactivate district error:", err.message);
+    logger.error({ err }, "Deactivate district error");
     return res.status(500).json({ error: "Failed to deactivate district.", details: err.message });
   }
 });

@@ -1,4 +1,5 @@
 const { auth, db } = require("../config/firebase");
+const { logger } = require("../utils/logger");
 
 /**
  * Verifies the Firebase ID token sent by the frontend in the
@@ -31,7 +32,7 @@ async function requireAuth(req, res, next) {
     req.user = { uid: decoded.uid, email: decoded.email, ...userDoc.data() };
     next();
   } catch (err) {
-    console.error("Auth error:", err.message);
+    logger.error({ err }, "Auth error");
     return res.status(401).json({ error: "Invalid or expired token." });
   }
 }

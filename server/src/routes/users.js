@@ -2,6 +2,7 @@ const express = require("express");
 const { db, admin } = require("../config/firebase");
 const { requireAuth } = require("../middleware/authMiddleware");
 const { normalizeSriLankanPhone } = require("../utils/phone");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -81,7 +82,7 @@ router.post("/profile", async (req, res) => {
 
     return res.status(201).json(profile);
   } catch (err) {
-    console.error("Create profile error:", err.message);
+    logger.error({ err }, "Create profile error");
     return res.status(500).json({ error: "Failed to create profile.", details: err.message });
   }
 });
@@ -126,7 +127,7 @@ router.patch("/profile", requireAuth, async (req, res) => {
     await db.collection("users").doc(req.user.uid).update(update);
     return res.json({ uid: req.user.uid, ...update });
   } catch (err) {
-    console.error("Update profile error:", err.message);
+    logger.error({ err }, "Update profile error");
     return res.status(500).json({ error: "Failed to update profile.", details: err.message });
   }
 });
@@ -152,7 +153,7 @@ router.get("/volunteers", requireAuth, async (req, res) => {
     const volunteers = snapshot.docs.map((doc) => doc.data());
     return res.json(volunteers);
   } catch (err) {
-    console.error("List volunteers error:", err.message);
+    logger.error({ err }, "List volunteers error");
     return res.status(500).json({ error: "Failed to list volunteers.", details: err.message });
   }
 });
@@ -177,7 +178,7 @@ router.patch("/availability", requireAuth, async (req, res) => {
     await db.collection("users").doc(req.user.uid).update({ available });
     return res.json({ uid: req.user.uid, available });
   } catch (err) {
-    console.error("Update availability error:", err.message);
+    logger.error({ err }, "Update availability error");
     return res.status(500).json({ error: "Failed to update availability.", details: err.message });
   }
 });
@@ -204,7 +205,7 @@ router.patch("/location", requireAuth, async (req, res) => {
     await db.collection("users").doc(req.user.uid).update({ location });
     return res.json({ uid: req.user.uid, location });
   } catch (err) {
-    console.error("Update location error:", err.message);
+    logger.error({ err }, "Update location error");
     return res.status(500).json({ error: "Failed to update location.", details: err.message });
   }
 });
@@ -230,7 +231,7 @@ router.post("/fcm-token", requireAuth, async (req, res) => {
 
     return res.json({ status: "ok" });
   } catch (err) {
-    console.error("Register FCM token error:", err.message);
+    logger.error({ err }, "Register FCM token error");
     return res.status(500).json({ error: "Failed to register notification token.", details: err.message });
   }
 });

@@ -2,6 +2,7 @@ const express = require("express");
 const { db } = require("../config/firebase");
 const { requireAuth } = require("../middleware/authMiddleware");
 const { sendNotificationToUser } = require("../utils/notifications");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.get("/mine", requireAuth, async (req, res) => {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return res.json(chats);
   } catch (err) {
-    console.error("List my chats error:", err.message);
+    logger.error({ err }, "List my chats error");
     return res.status(500).json({ error: "Failed to list chats.", details: err.message });
   }
 });
@@ -84,7 +85,7 @@ router.post("/:chatId/messages", requireAuth, async (req, res) => {
 
     return res.status(201).json({ status: "sent" });
   } catch (err) {
-    console.error("Send chat message error:", err.message);
+    logger.error({ err }, "Send chat message error");
     return res.status(500).json({ error: "Failed to send message.", details: err.message });
   }
 });
@@ -137,7 +138,7 @@ router.patch("/:chatId/consent", requireAuth, async (req, res) => {
 
     return res.json({ consentA: nowConsentA, consentB: nowConsentB, contactRevealed });
   } catch (err) {
-    console.error("Chat consent error:", err.message);
+    logger.error({ err }, "Chat consent error");
     return res.status(500).json({ error: "Failed to record consent.", details: err.message });
   }
 });
@@ -171,7 +172,7 @@ router.get("/:chatId/contact", requireAuth, async (req, res) => {
 
     return res.json({ revealed: true, name: userDoc.data().name, phone: userDoc.data().phone || null });
   } catch (err) {
-    console.error("Get chat contact error:", err.message);
+    logger.error({ err }, "Get chat contact error");
     return res.status(500).json({ error: "Failed to load contact details.", details: err.message });
   }
 });

@@ -8,6 +8,7 @@ const { sendNotificationToUser } = require("../utils/notifications");
 const { sendSmsToUser } = require("../utils/sms");
 const { createChatsForAcceptedDelivery, lockChatsForDelivery, createOrGetFellowTravellerChat } = require("../utils/deliveryChats");
 const { nearestDistrict } = require("../utils/districts");
+const { logger } = require("../utils/logger");
 
 // A delivery is "in transit and worth matching against" once the volunteer
 // has actually committed to it — excludes pending_acceptance (could still be
@@ -41,7 +42,7 @@ async function notifyVictimOfDeliveryStatus(delivery, deliveryId, status) {
     });
     await sendSmsToUser(victimId, copy.body);
   } catch (err) {
-    console.error(`Delivery status notification failed for delivery ${deliveryId}:`, err.message);
+    logger.error({ err, deliveryId }, "Delivery status notification failed");
   }
 }
 
@@ -162,7 +163,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
 
     return res.status(201).json({ id: docRef.id, ...delivery });
   } catch (err) {
-    console.error("Create delivery error:", err.message);
+    logger.error({ err }, "Create delivery error");
     return res.status(500).json({ error: "Failed to create delivery.", details: err.message });
   }
 });
@@ -178,7 +179,7 @@ router.get("/mine", requireAuth, requireRole("volunteer"), async (req, res) => {
     const deliveries = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json(deliveries);
   } catch (err) {
-    console.error("List my deliveries error:", err.message);
+    logger.error({ err }, "List my deliveries error");
     return res.status(500).json({ error: "Failed to list your deliveries.", details: err.message });
   }
 });
@@ -212,7 +213,7 @@ router.patch("/:id/accept", requireAuth, requireRole("volunteer"), async (req, r
 
     return res.json({ id: req.params.id, status: "accepted" });
   } catch (err) {
-    console.error("Accept delivery error:", err.message);
+    logger.error({ err }, "Accept delivery error");
     return res.status(500).json({ error: "Failed to accept delivery.", details: err.message });
   }
 });
@@ -249,7 +250,7 @@ router.patch("/:id/reject", requireAuth, requireRole("volunteer"), async (req, r
 
     return res.json({ id: req.params.id, status: "rejected" });
   } catch (err) {
-    console.error("Reject delivery error:", err.message);
+    logger.error({ err }, "Reject delivery error");
     return res.status(500).json({ error: "Failed to reject delivery.", details: err.message });
   }
 });
@@ -290,7 +291,7 @@ router.patch("/:id/status", requireAuth, requireRole("volunteer"), async (req, r
 
     return res.json({ id: req.params.id, ...update });
   } catch (err) {
-    console.error("Update delivery status error:", err.message);
+    logger.error({ err }, "Update delivery status error");
     return res.status(500).json({ error: "Failed to update delivery.", details: err.message });
   }
 });
@@ -327,7 +328,7 @@ router.patch("/:id/self-deliver", requireAuth, requireRole("donor"), async (req,
 
     return res.json({ id: req.params.id, status: "delivered", confirmToken });
   } catch (err) {
-    console.error("Self-deliver error:", err.message);
+    logger.error({ err }, "Self-deliver error");
     return res.status(500).json({ error: "Failed to mark as delivered.", details: err.message });
   }
 });
@@ -359,7 +360,7 @@ router.get("/by-request/:requestId", requireAuth, requireRole("victim"), async (
     });
     return res.json(deliveries);
   } catch (err) {
-    console.error("Lookup delivery by request error:", err.message);
+    logger.error({ err }, "Lookup delivery by request error");
     return res.status(500).json({ error: "Failed to look up deliveries.", details: err.message });
   }
 });
@@ -398,7 +399,7 @@ router.get("/:id/navigation-info", requireAuth, requireRole("volunteer"), async 
       dropoffLocation: requestDoc.data().location,
     });
   } catch (err) {
-    console.error("Delivery navigation-info error:", err.message);
+    logger.error({ err }, "Delivery navigation-info error");
     return res.status(500).json({ error: "Failed to load navigation info.", details: err.message });
   }
 });
@@ -428,7 +429,7 @@ router.get("/by-donation/:donationId", requireAuth, requireRole("donor"), async 
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     return res.json(deliveries);
   } catch (err) {
-    console.error("Lookup delivery by donation error:", err.message);
+    logger.error({ err }, "Lookup delivery by donation error");
     return res.status(500).json({ error: "Failed to look up delivery.", details: err.message });
   }
 });
@@ -476,7 +477,7 @@ router.post("/:id/confirm", requireAuth, requireRole("victim"), async (req, res)
 
     return res.json({ id: req.params.id, status: "confirmed", requestStatus: newRequestStatus });
   } catch (err) {
-    console.error("Confirm delivery error:", err.message);
+    logger.error({ err }, "Confirm delivery error");
     return res.status(500).json({ error: "Failed to confirm delivery.", details: err.message });
   }
 });
@@ -576,7 +577,7 @@ router.get("/:id/fellow-travellers", requireAuth, requireRole("volunteer"), asyn
     results.sort((a, b) => Number(b.sameDropoff) - Number(a.sameDropoff) || Number(b.sameRequest) - Number(a.sameRequest));
     return res.json(results);
   } catch (err) {
-    console.error("Fellow travellers lookup error:", err.message);
+    logger.error({ err }, "Fellow travellers lookup error");
     return res.status(500).json({ error: "Failed to look up fellow travellers.", details: err.message });
   }
 });
@@ -643,7 +644,7 @@ router.post("/:id/fellow-travellers/:otherId/chat", requireAuth, requireRole("vo
     const chatId = await createOrGetFellowTravellerChat(req.params.id, req.user.uid, req.params.otherId, other.volunteerId);
     return res.json({ chatId });
   } catch (err) {
-    console.error("Fellow traveller chat error:", err.message);
+    logger.error({ err }, "Fellow traveller chat error");
     return res.status(500).json({ error: "Failed to start chat.", details: err.message });
   }
 });
@@ -764,7 +765,7 @@ router.post("/:id/handoff", requireAuth, requireRole("volunteer"), async (req, r
 
     return res.status(201).json({ id: handoffRef.id, ...handoff });
   } catch (err) {
-    console.error("Create handoff error:", err.message);
+    logger.error({ err }, "Create handoff error");
     return res.status(500).json({ error: "Failed to create handoff request.", details: err.message });
   }
 });
@@ -786,7 +787,7 @@ router.get("/handoffs/mine", requireAuth, requireRole("volunteer"), async (req, 
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return res.json(handoffs);
   } catch (err) {
-    console.error("List my handoffs error:", err.message);
+    logger.error({ err }, "List my handoffs error");
     return res.status(500).json({ error: "Failed to list handoffs.", details: err.message });
   }
 });
@@ -869,7 +870,7 @@ router.patch("/handoffs/:id/accept", requireAuth, requireRole("volunteer"), asyn
 
     return res.json({ id: handoff.deliveryId, status: delivery.status, volunteerId: req.user.uid });
   } catch (err) {
-    console.error("Accept handoff error:", err.message);
+    logger.error({ err }, "Accept handoff error");
     return res.status(500).json({ error: "Failed to accept handoff.", details: err.message });
   }
 });
@@ -904,7 +905,7 @@ router.patch("/handoffs/:id/decline", requireAuth, requireRole("volunteer"), asy
 
     return res.json({ id: req.params.id, status: "declined" });
   } catch (err) {
-    console.error("Decline handoff error:", err.message);
+    logger.error({ err }, "Decline handoff error");
     return res.status(500).json({ error: "Failed to decline handoff.", details: err.message });
   }
 });
@@ -937,7 +938,7 @@ router.patch("/handoffs/:id/cancel", requireAuth, requireRole("volunteer"), asyn
 
     return res.json({ id: req.params.id, status: "cancelled" });
   } catch (err) {
-    console.error("Cancel handoff error:", err.message);
+    logger.error({ err }, "Cancel handoff error");
     return res.status(500).json({ error: "Failed to cancel handoff.", details: err.message });
   }
 });

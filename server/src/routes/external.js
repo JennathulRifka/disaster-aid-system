@@ -26,6 +26,7 @@ const { predictAllDistricts, isModelAvailable, getModelMeta, reloadModel } = req
 const { trainFloodRiskModel } = require("../utils/trainFloodRiskModel");
 const { requireAuth, requireRole } = require("../middleware/authMiddleware");
 const { logAction } = require("../utils/auditLog");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -235,7 +236,7 @@ router.get("/alerts", async (req, res) => {
 
     return res.json(alerts);
   } catch (err) {
-    console.error("DMC alerts fetch error:", err.message);
+    logger.error({ err }, "DMC alerts fetch error");
     // Fail soft — an external outage shouldn't break the page that shows this.
     return res.json([]);
   }
@@ -333,7 +334,7 @@ async function fetchCapPolygon(capUrl) {
     }
     return null;
   } catch (err) {
-    console.error(`GDACS CAP polygon fetch error (${capUrl}):`, err.message);
+    logger.error({ err, capUrl }, "GDACS CAP polygon fetch error");
     return null;
   }
 }
@@ -408,7 +409,7 @@ router.get("/water-levels", async (req, res) => {
     const stations = await fetchWaterLevels();
     return res.json(stations);
   } catch (err) {
-    console.error("River gauge fetch error:", err.message);
+    logger.error({ err }, "River gauge fetch error");
     return res.json([]);
   }
 });
@@ -457,7 +458,7 @@ router.get("/gdacs", async (req, res) => {
 
     return res.json(events);
   } catch (err) {
-    console.error("GDACS fetch error:", err.message);
+    logger.error({ err }, "GDACS fetch error");
     // Fail soft, same as the other external feeds — an outage on GDACS's
     // side shouldn't break the page that shows this.
     return res.json([]);
@@ -521,7 +522,7 @@ router.get("/district-boundaries", async (req, res) => {
     );
     return res.json(geojson);
   } catch (err) {
-    console.error("District boundaries fetch error:", err.message);
+    logger.error({ err }, "District boundaries fetch error");
     // Fail soft, same as the other external feeds — the frontend falls back
     // to its existing centroid-circle rendering if this comes back empty.
     return res.json(null);
@@ -561,7 +562,7 @@ router.get("/world-countries", (req, res) => {
   try {
     return res.json(getWorldCountriesGeoJson());
   } catch (err) {
-    console.error("World countries error:", err.message);
+    logger.error({ err }, "World countries error");
     return res.json({ type: "FeatureCollection", features: [] });
   }
 });
@@ -616,7 +617,7 @@ router.get("/earthquakes", async (req, res) => {
 
     return res.json(earthquakes);
   } catch (err) {
-    console.error("USGS earthquake fetch error:", err.message);
+    logger.error({ err }, "USGS earthquake fetch error");
     return res.json([]);
   }
 });
@@ -632,7 +633,7 @@ router.get("/earthquakes", async (req, res) => {
 router.get("/weather", async (req, res) => {
   try {
     if (!OPENWEATHER_API_KEY) {
-      console.error("Weather fetch skipped: OPENWEATHER_API_KEY is not set.");
+      logger.warn("Weather fetch skipped: OPENWEATHER_API_KEY is not set.");
       return res.json([]);
     }
 
@@ -662,7 +663,7 @@ router.get("/weather", async (req, res) => {
               rainLastHourMm: data.rain?.["1h"] ?? 0,
             };
           } catch (err) {
-            console.error(`Weather fetch failed for ${city}:`, err.message);
+            logger.error({ err, city }, "Weather fetch failed");
             return { city, district, error: true };
           }
         })
@@ -671,7 +672,7 @@ router.get("/weather", async (req, res) => {
 
     return res.json(results);
   } catch (err) {
-    console.error("Weather fetch error:", err.message);
+    logger.error({ err }, "Weather fetch error");
     return res.json([]);
   }
 });
@@ -876,7 +877,7 @@ async function fetchReservoirs() {
 
     results.forEach((r, i) => {
       if (r.status === "rejected") {
-        console.error(`Failed to fetch ${sources[i].label} reservoir data:`, r.reason?.message);
+        logger.error({ err: r.reason, source: sources[i].label }, "Failed to fetch reservoir data");
       }
     });
 
@@ -890,7 +891,7 @@ router.get("/reservoirs", async (req, res) => {
     const reservoirs = await fetchReservoirs();
     return res.json(reservoirs);
   } catch (err) {
-    console.error("Reservoirs fetch error:", err.message);
+    logger.error({ err }, "Reservoirs fetch error");
     return res.json([]);
   }
 });
@@ -915,7 +916,7 @@ router.get("/flood-risk", async (req, res) => {
     const districts = await getCached("flood-risk", FLOOD_RISK_CACHE_TTL_MS, predictAllDistricts);
     return res.json({ available: true, model: getModelMeta(), districts });
   } catch (err) {
-    console.error("Flood risk error:", err.message);
+    logger.error({ err }, "Flood risk error");
     return res.json({ available: false, districts: [] });
   }
 });
@@ -945,7 +946,7 @@ router.post("/flood-risk/retrain", requireAuth, requireRole("admin"), async (req
     });
     return res.json({ success: true, model: getModelMeta() });
   } catch (err) {
-    console.error("Flood risk retrain error:", err.message);
+    logger.error({ err }, "Flood risk retrain error");
     return res.status(500).json({ error: "Retraining failed.", details: err.message });
   }
 });
@@ -971,7 +972,7 @@ router.post("/flood-risk/retrain", requireAuth, requireRole("admin"), async (req
 // calls `require("express")`) is the only thing that ever calls it.
 function warmDistrictBoundariesCache() {
   return getCached("district-boundaries", DISTRICT_BOUNDARIES_CACHE_TTL_MS, fetchDistrictBoundaries).catch((err) => {
-    console.error("District boundaries warm-up fetch failed:", err.message);
+    logger.error({ err }, "District boundaries warm-up fetch failed");
   });
 }
 

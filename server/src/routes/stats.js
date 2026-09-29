@@ -2,6 +2,7 @@ const express = require("express");
 const { db } = require("../config/firebase");
 const { DISTRICTS, nearestDistrict } = require("../utils/districts");
 const { getCached } = require("../utils/cache");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -74,7 +75,7 @@ router.get("/", async (req, res) => {
 
     return res.json(stats);
   } catch (err) {
-    console.error("Stats error:", err.message);
+    logger.error({ err }, "Stats error");
     return res.status(500).json({ error: "Failed to load stats.", details: err.message });
   }
 });
@@ -118,7 +119,7 @@ router.get("/by-area", async (req, res) => {
 
     return res.json(areas);
   } catch (err) {
-    console.error("Stats by-area error:", err.message);
+    logger.error({ err }, "Stats by-area error");
     return res.status(500).json({ error: "Failed to load area stats.", details: err.message });
   }
 });
@@ -163,7 +164,7 @@ router.get("/district-need", async (req, res) => {
 
     return res.json(rows);
   } catch (err) {
-    console.error("Stats district-need error:", err.message);
+    logger.error({ err }, "Stats district-need error");
     return res.status(500).json({ error: "Failed to load district need.", details: err.message });
   }
 });

@@ -3,6 +3,7 @@ const { db } = require("../config/firebase");
 const { requireAuth, requireRole } = require("../middleware/authMiddleware");
 const { sendNotificationToUser } = require("../utils/notifications");
 const { logAction } = require("../utils/auditLog");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -62,7 +63,7 @@ router.post("/", requireAuth, async (req, res) => {
 
     return res.status(201).json({ id: docRef.id, ...sos });
   } catch (err) {
-    console.error("Create SOS error:", err.message);
+    logger.error({ err }, "Create SOS error");
     return res.status(500).json({ error: "Failed to submit SOS.", details: err.message });
   }
 });
@@ -86,7 +87,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
       });
     return res.json(reports);
   } catch (err) {
-    console.error("List SOS error:", err.message);
+    logger.error({ err }, "List SOS error");
     return res.status(500).json({ error: "Failed to list SOS reports.", details: err.message });
   }
 });
@@ -102,7 +103,7 @@ router.get("/mine", requireAuth, async (req, res) => {
     const reports = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json(reports);
   } catch (err) {
-    console.error("List my SOS error:", err.message);
+    logger.error({ err }, "List my SOS error");
     return res.status(500).json({ error: "Failed to list your SOS reports.", details: err.message });
   }
 });
@@ -156,7 +157,7 @@ router.patch("/:id/status", requireAuth, requireRole("admin"), async (req, res) 
 
     return res.json({ id: req.params.id, status });
   } catch (err) {
-    console.error("Update SOS status error:", err.message);
+    logger.error({ err }, "Update SOS status error");
     return res.status(500).json({ error: "Failed to update SOS status.", details: err.message });
   }
 });

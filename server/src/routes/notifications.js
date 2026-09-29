@@ -1,6 +1,7 @@
 const express = require("express");
 const { db } = require("../config/firebase");
 const { requireAuth } = require("../middleware/authMiddleware");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ router.get("/mine", requireAuth, async (req, res) => {
       .slice(0, 50);
     return res.json(notifications);
   } catch (err) {
-    console.error("List notifications error:", err.message);
+    logger.error({ err }, "List notifications error");
     return res.status(500).json({ error: "Failed to load notifications.", details: err.message });
   }
 });
@@ -42,7 +43,7 @@ router.patch("/:id/read", requireAuth, async (req, res) => {
     await ref.update({ read: true });
     return res.json({ status: "ok" });
   } catch (err) {
-    console.error("Mark notification read error:", err.message);
+    logger.error({ err }, "Mark notification read error");
     return res.status(500).json({ error: "Failed to update notification.", details: err.message });
   }
 });
@@ -64,7 +65,7 @@ router.patch("/mark-all-read", requireAuth, async (req, res) => {
     await batch.commit();
     return res.json({ status: "ok", updated: snapshot.size });
   } catch (err) {
-    console.error("Mark all notifications read error:", err.message);
+    logger.error({ err }, "Mark all notifications read error");
     return res.status(500).json({ error: "Failed to update notifications.", details: err.message });
   }
 });

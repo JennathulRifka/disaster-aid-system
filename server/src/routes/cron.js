@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { checkWaterLevelsAndAlert, checkReservoirsAndAlert } = require("../utils/waterLevelAlerts");
+const { logger } = require("../utils/logger");
 
 /**
  * Vercel Cron Jobs — the serverless replacement for server.js's own
@@ -46,7 +47,7 @@ router.get("/water-levels", requireCronSecret, async (req, res) => {
     await checkWaterLevelsAndAlert();
     res.json({ ok: true });
   } catch (err) {
-    console.error("Cron water-levels check failed:", err.message);
+    logger.error({ err }, "Cron water-levels check failed");
     res.status(500).json({ error: "Water-level check failed.", details: err.message });
   }
 });
@@ -56,7 +57,7 @@ router.get("/reservoirs", requireCronSecret, async (req, res) => {
     await checkReservoirsAndAlert();
     res.json({ ok: true });
   } catch (err) {
-    console.error("Cron reservoirs check failed:", err.message);
+    logger.error({ err }, "Cron reservoirs check failed");
     res.status(500).json({ error: "Reservoir check failed.", details: err.message });
   }
 });

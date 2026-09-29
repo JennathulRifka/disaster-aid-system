@@ -4,6 +4,7 @@ const { requireAuth, requireRole } = require("../middleware/authMiddleware");
 const { nearestDistrict } = require("../utils/districts");
 const { logAction } = require("../utils/auditLog");
 const { notifyDistrictActivated } = require("./activeDistricts");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -52,7 +53,7 @@ router.post("/", requireAuth, requireRole("volunteer"), async (req, res) => {
     const docRef = await db.collection("communityReports").add(report);
     return res.status(201).json({ id: docRef.id, ...report });
   } catch (err) {
-    console.error("Create community report error:", err.message);
+    logger.error({ err }, "Create community report error");
     return res.status(500).json({ error: "Failed to submit report.", details: err.message });
   }
 });
@@ -75,7 +76,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
       });
     return res.json(reports);
   } catch (err) {
-    console.error("List community reports error:", err.message);
+    logger.error({ err }, "List community reports error");
     return res.status(500).json({ error: "Failed to list reports.", details: err.message });
   }
 });
@@ -96,7 +97,7 @@ router.get("/verified", async (req, res) => {
       .sort((a, b) => b.verifiedAt.localeCompare(a.verifiedAt));
     return res.json(reports);
   } catch (err) {
-    console.error("List verified reports error:", err.message);
+    logger.error({ err }, "List verified reports error");
     return res.status(500).json({ error: "Failed to list verified reports.", details: err.message });
   }
 });
@@ -148,7 +149,7 @@ router.patch("/:id/verify", requireAuth, requireRole("admin"), async (req, res) 
 
     return res.json({ id: req.params.id, status: newStatus });
   } catch (err) {
-    console.error("Verify community report error:", err.message);
+    logger.error({ err }, "Verify community report error");
     return res.status(500).json({ error: "Failed to verify report.", details: err.message });
   }
 });

@@ -1,4 +1,5 @@
 const { admin, db } = require("../config/firebase");
+const { logger } = require("./logger");
 
 /**
  * Sends a push notification to every device a user has registered an FCM
@@ -26,7 +27,7 @@ async function sendNotificationToUser(uid, { title, body, data = {} }) {
       createdAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error(`Notification history write failed for user ${uid}:`, err.message);
+    logger.error({ err, uid }, "Notification history write failed");
   }
 
   try {
@@ -62,7 +63,7 @@ async function sendNotificationToUser(uid, { title, body, data = {} }) {
         .update({ fcmTokens: admin.firestore.FieldValue.arrayRemove(...deadTokens) });
     }
   } catch (err) {
-    console.error(`Notification send failed for user ${uid}:`, err.message);
+    logger.error({ err, uid }, "Notification send failed");
   }
 }
 

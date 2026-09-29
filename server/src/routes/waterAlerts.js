@@ -3,6 +3,7 @@ const { db } = require("../config/firebase");
 const { requireAuth, requireRole } = require("../middleware/authMiddleware");
 const { sendAreaAlert } = require("../utils/waterLevelAlerts");
 const { logAction } = require("../utils/auditLog");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ router.get("/settings", requireAuth, requireRole("admin"), async (req, res) => {
     const doc = await db.collection("waterLevelAlertSettings").doc("config").get();
     return res.json({ autoSend: doc.exists ? doc.data().autoSend === true : false });
   } catch (err) {
-    console.error("Get water alert settings error:", err.message);
+    logger.error({ err }, "Get water alert settings error");
     return res.status(500).json({ error: "Failed to load settings.", details: err.message });
   }
 });
@@ -41,7 +42,7 @@ router.patch("/settings", requireAuth, requireRole("admin"), async (req, res) =>
 
     return res.json({ autoSend });
   } catch (err) {
-    console.error("Update water alert settings error:", err.message);
+    logger.error({ err }, "Update water alert settings error");
     return res.status(500).json({ error: "Failed to update settings.", details: err.message });
   }
 });
@@ -59,7 +60,7 @@ router.get("/pending", requireAuth, requireRole("admin"), async (req, res) => {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return res.json(pending);
   } catch (err) {
-    console.error("List pending area alerts error:", err.message);
+    logger.error({ err }, "List pending area alerts error");
     return res.status(500).json({ error: "Failed to list pending alerts.", details: err.message });
   }
 });
@@ -99,7 +100,7 @@ router.post("/pending/:id/approve", requireAuth, requireRole("admin"), async (re
 
     return res.json({ id: req.params.id, status: "approved", notifiedCount });
   } catch (err) {
-    console.error("Approve area alert error:", err.message);
+    logger.error({ err }, "Approve area alert error");
     return res.status(500).json({ error: "Failed to approve alert.", details: err.message });
   }
 });
@@ -123,7 +124,7 @@ router.post("/pending/:id/reject", requireAuth, requireRole("admin"), async (req
 
     return res.json({ id: req.params.id, status: "rejected" });
   } catch (err) {
-    console.error("Reject area alert error:", err.message);
+    logger.error({ err }, "Reject area alert error");
     return res.status(500).json({ error: "Failed to reject alert.", details: err.message });
   }
 });
@@ -142,7 +143,7 @@ router.get("/sent", requireAuth, requireRole("admin"), async (req, res) => {
       .slice(0, 50);
     return res.json(sent);
   } catch (err) {
-    console.error("List sent area alerts error:", err.message);
+    logger.error({ err }, "List sent area alerts error");
     return res.status(500).json({ error: "Failed to list sent alerts.", details: err.message });
   }
 });

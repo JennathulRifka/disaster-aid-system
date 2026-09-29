@@ -7,6 +7,7 @@ const { logAction } = require("../utils/auditLog");
 const { sendNotificationToUser } = require("../utils/notifications");
 const { sendSmsToUser } = require("../utils/sms");
 const { normalizeAddress, normalizeNic, validateItems } = require("../utils/requestValidation");
+const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
@@ -101,7 +102,7 @@ router.post("/", requireAuth, requireRole("victim"), async (req, res) => {
 
     return res.status(201).json({ id: docRef.id, ...requestData });
   } catch (err) {
-    console.error("Create request error:", err.message);
+    logger.error({ err }, "Create request error");
     return res.status(500).json({ error: "Failed to create request.", details: err.message });
   }
 });
@@ -124,7 +125,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
 
     return res.json(requests);
   } catch (err) {
-    console.error("List requests error:", err.message);
+    logger.error({ err }, "List requests error");
     return res.status(500).json({ error: "Failed to list requests.", details: err.message });
   }
 });
@@ -139,7 +140,7 @@ router.get("/mine", requireAuth, requireRole("victim"), async (req, res) => {
     const requests = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     return res.json(requests);
   } catch (err) {
-    console.error("List my requests error:", err.message);
+    logger.error({ err }, "List my requests error");
     return res.status(500).json({ error: "Failed to list your requests.", details: err.message });
   }
 });
@@ -183,7 +184,7 @@ router.patch("/:id/verify", requireAuth, requireRole("admin"), async (req, res) 
 
     return res.json({ id: req.params.id, status: newStatus });
   } catch (err) {
-    console.error("Verify request error:", err.message);
+    logger.error({ err }, "Verify request error");
     return res.status(500).json({ error: "Failed to verify request.", details: err.message });
   }
 });
@@ -250,7 +251,7 @@ router.patch("/bulk-verify", requireAuth, requireRole("admin"), async (req, res)
 
     return res.json({ status: newStatus, updated, skipped });
   } catch (err) {
-    console.error("Bulk verify error:", err.message);
+    logger.error({ err }, "Bulk verify error");
     return res.status(500).json({ error: "Failed to bulk-verify requests.", details: err.message });
   }
 });
@@ -273,7 +274,7 @@ router.patch("/:id/status", requireAuth, requireRole("admin"), async (req, res) 
     await ref.update({ status, updatedAt: new Date().toISOString() });
     return res.json({ id: req.params.id, status });
   } catch (err) {
-    console.error("Update status error:", err.message);
+    logger.error({ err }, "Update status error");
     return res.status(500).json({ error: "Failed to update status.", details: err.message });
   }
 });
@@ -295,7 +296,7 @@ router.get("/:id/notes", requireAuth, requireRole("admin"), async (req, res) => 
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     return res.json(notes);
   } catch (err) {
-    console.error("List case notes error:", err.message);
+    logger.error({ err }, "List case notes error");
     return res.status(500).json({ error: "Failed to list case notes.", details: err.message });
   }
 });
@@ -327,7 +328,7 @@ router.post("/:id/notes", requireAuth, requireRole("admin"), async (req, res) =>
 
     return res.status(201).json({ id: docRef.id, ...note });
   } catch (err) {
-    console.error("Create case note error:", err.message);
+    logger.error({ err }, "Create case note error");
     return res.status(500).json({ error: "Failed to create case note.", details: err.message });
   }
 });

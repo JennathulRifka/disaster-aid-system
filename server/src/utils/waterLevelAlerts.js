@@ -2,6 +2,7 @@ const { db } = require("../config/firebase");
 const { nearestDistrict } = require("./districts");
 const { sendNotificationToUser } = require("./notifications");
 const { sendSmsToUser } = require("./sms");
+const { logger } = require("./logger");
 
 const ACTIVE_REQUEST_STATUSES = ["pending", "verified", "in_progress"];
 
@@ -167,7 +168,7 @@ async function checkWaterLevelsAndAlert() {
       await stateRef.set({ station: gauge.station, lastStatus: gauge.status, updatedAt: new Date().toISOString() });
     }
   } catch (err) {
-    console.error("Water level alert check failed:", err.message);
+    logger.error({ err }, "Water level alert check failed");
   }
 }
 
@@ -227,7 +228,7 @@ async function checkReservoirsAndAlert() {
       await stateRef.set({ station: reservoir.name, lastStatus: reservoir.riskLevel, updatedAt: new Date().toISOString() });
     }
   } catch (err) {
-    console.error("Reservoir alert check failed:", err.message);
+    logger.error({ err }, "Reservoir alert check failed");
   }
 }
 
