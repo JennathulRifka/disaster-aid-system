@@ -9,7 +9,13 @@
 
 import { auth } from "./firebase";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// An explicit VITE_API_URL always wins. Otherwise: in a production build
+// (Vercel's "web" service), default to "" so every call is a relative
+// /api/... path — the top-level rewrite in vercel.json puts both services on
+// one origin, so the browser never needs the backend's actual address. In
+// local `vite dev` (two separate processes, ports 5173/5000, no rewrite in
+// front of either), keep pointing straight at the server.
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://localhost:5000");
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
   const user = auth.currentUser;

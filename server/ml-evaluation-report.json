@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-04T16:54:25.948Z",
+  "generatedAt": "2026-09-29T11:19:26.926Z",
   "dataIntegrity": {
     "totalRecords": 8182,
     "yearRange": [
@@ -10,7 +10,7 @@
     "distinctDistrictsInData": 25
   },
   "model": {
-    "trainedAt": "2026-09-04T16:54:24.568Z",
+    "trainedAt": "2026-09-29T11:19:26.515Z",
     "trainingWindow": {
       "startYear": 1981,
       "endYear": 2020

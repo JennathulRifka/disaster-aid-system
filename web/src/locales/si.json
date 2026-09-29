@@ -366,7 +366,9 @@
   },
   "transparency": {
     "title": "විනිවිදභාව උපකරණ පුවරුව",
+    "subtitle": "දත්ත සමුදායෙන් සෘජුවම ලැබෙන සැබෑ ගණන් — ස්වයංක්‍රීයව යාවත්කාලීන වේ.",
     "loadingLive": "සජීවී දත්ත පූරණය වෙමින්...",
+    "updatedSecondsAgo": "තත්පර {{seconds}}කට පෙර යාවත්කාලීන කරන ලදී",
     "totalRequests": "මුළු සහාය ඉල්ලීම්",
     "totalDonations": "මුළු පරිත්‍යාග",
     "confirmedDeliveries": "තහවුරු කළ බෙදාහැරීම්",
@@ -375,6 +377,7 @@
     "requestsByStatus": "තත්ත්වය අනුව ඉල්ලීම්",
     "requestsByDisasterType": "ආපදා වර්ගය අනුව ඉල්ලීම්",
     "donationsByStatus": "තත්ත්වය අනුව පරිත්‍යාග",
+    "deliveriesByStatus": "තත්ත්වය අනුව බෙදාහැරීම්",
     "noDataYet": "තවම දත්ත නැත."
   },
   "severityMap": {

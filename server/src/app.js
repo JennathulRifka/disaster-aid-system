@@ -18,6 +18,7 @@ const sosRoutes = require("./routes/sos");
 const communityReportsRoutes = require("./routes/communityReports");
 const chatsRoutes = require("./routes/chats");
 const notificationsRoutes = require("./routes/notifications");
+const cronRoutes = require("./routes/cron");
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use("/api/sos", sosRoutes);
 app.use("/api/community-reports", communityReportsRoutes);
 app.use("/api/chats", chatsRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/cron", cronRoutes);
 
 // 404 handler
 app.use((req, res) => {

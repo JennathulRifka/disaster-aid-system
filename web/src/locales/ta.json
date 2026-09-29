@@ -366,7 +366,9 @@
   },
   "transparency": {
     "title": "வெளிப்படைத்தன்மை டாஷ்போர்டு",
+    "subtitle": "தரவுத்தளத்திலிருந்து நேரடியாக பெறப்படும் உண்மையான எண்ணிக்கைகள் — தானாக புதுப்பிக்கப்படும்.",
     "loadingLive": "நேரடி தரவை ஏற்றுகிறது...",
+    "updatedSecondsAgo": "{{seconds}} வினாடிகளுக்கு முன் புதுப்பிக்கப்பட்டது",
     "totalRequests": "மொத்த உதவி கோரிக்கைகள்",
     "totalDonations": "மொத்த நன்கொடைகள்",
     "confirmedDeliveries": "உறுதிப்படுத்தப்பட்ட வழங்கல்கள்",
@@ -375,6 +377,7 @@
     "requestsByStatus": "நிலை வாரியான கோரிக்கைகள்",
     "requestsByDisasterType": "பேரிடர் வகை வாரியான கோரிக்கைகள்",
     "donationsByStatus": "நிலை வாரியான நன்கொடைகள்",
+    "deliveriesByStatus": "நிலை வாரியான வழங்கல்கள்",
     "noDataYet": "இன்னும் தரவு இல்லை."
   },
   "severityMap": {

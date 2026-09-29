@@ -1,7 +1,7 @@
 # Flood Risk Model — Test Results
 
-Generated: 2026-09-04T16:54:25.948Z
-Model trained: 2026-09-04T16:54:24.568Z (training window 1981-2020)
+Generated: 2026-09-29T11:19:26.926Z
+Model trained: 2026-09-29T11:19:26.515Z (training window 1981-2020)
 
 ## 1. Data integrity
 

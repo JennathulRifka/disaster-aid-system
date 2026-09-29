@@ -10,6 +10,11 @@ firebase-debug.*.log*
 # Firebase cache
 .firebase/
 
+# Vercel CLI project-link metadata (created by `vercel link`/`vercel dev`
+# if ever run locally — not needed when deploying via the dashboard's
+# GitHub import, but harmless/ignorable either way)
+.vercel/
+
 # Firebase config
 
 # Uncomment this if you'd like others to create their own Firebase project.

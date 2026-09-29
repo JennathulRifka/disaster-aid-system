@@ -366,7 +366,9 @@
   },
   "transparency": {
     "title": "Transparency Dashboard",
+    "subtitle": "Real counts, straight from the database — updated automatically.",
     "loadingLive": "Loading live data...",
+    "updatedSecondsAgo": "Updated {{seconds}}s ago",
     "totalRequests": "Total Aid Requests",
     "totalDonations": "Total Donations",
     "confirmedDeliveries": "Confirmed Deliveries",
@@ -375,6 +377,7 @@
     "requestsByStatus": "Requests by Status",
     "requestsByDisasterType": "Requests by Disaster Type",
     "donationsByStatus": "Donations by Status",
+    "deliveriesByStatus": "Deliveries by Status",
     "noDataYet": "No data yet."
   },
   "severityMap": {
