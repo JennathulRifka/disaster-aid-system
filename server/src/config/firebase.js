@@ -21,10 +21,23 @@ if (serviceAccountPath) {
   credential = admin.credential.cert(serviceAccount);
 } else {
   // Fallback method: individual env vars (kept for platforms like Render/Railway
-  // where uploading a JSON file isn't convenient).
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+  // and Vercel, where uploading a JSON file isn't convenient).
+  //
+  // Strip a single pair of wrapping quotes if present — the most common way
+  // this breaks in practice is pasting the value straight out of the
+  // downloaded JSON file, including the surrounding double quotes from the
+  // `"private_key": "..."` line, into a platform's env var UI. That turns a
+  // valid PEM string into one with a stray `"` glued to each end, which
+  // fails with a cryptic "Invalid PEM formatted message" error that gives no
+  // hint what's actually wrong.
+  const stripWrappingQuotes = (value) =>
+    value.length >= 2 && value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value;
 
-  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
+  const privateKey = stripWrappingQuotes((process.env.FIREBASE_PRIVATE_KEY || "").trim()).replace(/\\n/g, "\n");
+  const projectId = stripWrappingQuotes((process.env.FIREBASE_PROJECT_ID || "").trim());
+  const clientEmail = stripWrappingQuotes((process.env.FIREBASE_CLIENT_EMAIL || "").trim());
+
+  if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
       "Missing Firebase credentials. Either set FIREBASE_SERVICE_ACCOUNT_PATH to point at your " +
       "downloaded service account JSON file (recommended), or set FIREBASE_PROJECT_ID, " +
@@ -33,9 +46,9 @@ if (serviceAccountPath) {
   }
 
   credential = admin.credential.cert({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: privateKey,
+    projectId,
+    clientEmail,
+    privateKey,
   });
 }
 
