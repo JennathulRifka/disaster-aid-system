@@ -46,12 +46,23 @@ async function sendNotificationToUser(uid, { title, body, data = {} }) {
     // "invalid-registration-token") or malformed ("invalid-argument", the
     // code FCM actually returns for a garbage/non-FCM-shaped string, e.g. a
     // truncated write or a bad value from some other client bug) — so this
-    // list doesn't grow stale forever.
+    // list doesn't grow stale forever. "mismatched-credential" ("SenderId
+    // mismatch") means the token was issued for a different Firebase project
+    // than this server sends from (e.g. an app built with another project's
+    // google-services.json) — it can never be delivered to, so it's dead too.
     const DEAD_TOKEN_CODES = [
       "messaging/registration-token-not-registered",
       "messaging/invalid-registration-token",
       "messaging/invalid-argument",
+      "messaging/mismatched-credential",
     ];
+
+    // A failed send used to vanish silently — log each one so a push that
+    // isn't arriving is diagnosable from the server log.
+    response.responses.forEach((r) => {
+      if (!r.success) logger.warn({ uid, code: r.error?.code, reason: r.error?.message }, "FCM send failed for a token");
+    });
+
     const deadTokens = response.responses
       .map((r, i) => (DEAD_TOKEN_CODES.includes(r.error?.code) ? tokens[i] : null))
       .filter(Boolean);
