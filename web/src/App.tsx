@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -12,7 +13,8 @@ import DonorMyDonations from "@/pages/DonorMyDonations";
 import AdminRequests from "@/pages/AdminRequests";
 import AdminDonations from "@/pages/AdminDonations";
 import VolunteerDeliveries from "@/pages/VolunteerDeliveries";
-import VolunteerNavigation from "@/pages/VolunteerNavigation";
+// Loaded on demand: pulls in MapLibre (~1 MB), which only volunteers on this page need.
+const VolunteerNavigation = lazy(() => import("@/pages/VolunteerNavigation"));
 import VolunteerCommunityReport from "@/pages/VolunteerCommunityReport";
 import PublicSeverityMap from "@/pages/PublicSeverityMap";
 import SituationMap from "@/pages/SituationMap";
@@ -220,7 +222,9 @@ export default function App() {
         path="/deliveries/:id/navigate"
         element={
           <ProtectedRoute allowedRoles={["volunteer"]}>
-            <VolunteerNavigation />
+            <Suspense fallback={<p className="p-6 text-sm text-gray-500">Loading...</p>}>
+              <VolunteerNavigation />
+            </Suspense>
           </ProtectedRoute>
         }
       />
