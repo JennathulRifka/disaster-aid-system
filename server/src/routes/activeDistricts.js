@@ -5,6 +5,7 @@ const { DISTRICTS } = require("../utils/districts");
 const { logAction } = require("../utils/auditLog");
 const { findVictimsInDistrict } = require("../utils/waterLevelAlerts");
 const { sendNotificationToUser } = require("../utils/notifications");
+const { sendSmsToUser } = require("../utils/sms");
 const { logger } = require("../utils/logger");
 
 const router = express.Router();
@@ -21,12 +22,11 @@ function slugify(name) {
  * logic already built for water-level/reservoir area alerts
  * (findVictimsInDistrict, in waterLevelAlerts.js): a victim's "location" only
  * ever exists via their own request, there's no separate profile-level
- * location for victims to match against. FCM only, deliberately no SMS —
- * unlike the already-wired water/reservoir alert triggers (which the user
- * explicitly approved spending SMS quota on), this is a new trigger point
- * that fires on every district activation across all 25 districts, and this
- * project's standing rule is that spending real Text.lk quota on a new
- * trigger needs its own deliberate go-ahead, not an assumed extension.
+ * location for victims to match against. Sends FCM and SMS to each matched
+ * victim. SMS was initially left off here on purpose — this fires on every
+ * district activation, and this project's standing rule is that spending real
+ * Text.lk quota on a new trigger needs its own deliberate go-ahead — and was
+ * then explicitly approved by the user for district declarations.
  * Exported (attached to the router, same "Express Router instances are just
  * functions" convention as waterLevelAlerts.js's router.fetchWaterLevels) so
  * the community-reports promotion path (communityReports.js's own direct
@@ -42,14 +42,20 @@ function slugify(name) {
  */
 async function notifyDistrictActivated(district, activatedByUid) {
   const victimIds = await findVictimsInDistrict(district);
+  const body = `An active emergency has been declared in ${district}. Stay alert and follow official guidance.`;
   await Promise.all(
-    victimIds.map((uid) =>
-      sendNotificationToUser(uid, {
+    victimIds.map(async (uid) => {
+      await sendNotificationToUser(uid, {
         title: "Active emergency declared",
-        body: `An active emergency has been declared in ${district}. Stay alert and follow official guidance.`,
+        body,
         data: { type: "district_activated", district },
-      })
-    )
+      });
+      // SMS too (explicitly approved for this trigger) — a victim without a
+      // valid Sri Lankan mobile number on file is simply skipped by
+      // sendSmsToUser. Minimal text only: district + generic guidance, no
+      // personal data. Deliberately not sent to the confirming admin below.
+      await sendSmsToUser(uid, `Disaster Aid: ${body}`);
+    })
   );
   if (activatedByUid) {
     await sendNotificationToUser(activatedByUid, {
