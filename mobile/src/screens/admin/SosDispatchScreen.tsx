@@ -11,9 +11,11 @@ interface SosReport {
   type: "trapped" | "missing_person" | "flood_rescue" | "other";
   peopleCount: number | null;
   description: string;
-  location: { lat: number; lng: number };
+  // Optional on purpose: an older or malformed record can lack coordinates, and one
+  // such report must not crash the whole dispatch screen.
+  location?: { lat: number; lng: number };
   status: "pending" | "acknowledged" | "in_progress" | "resolved";
-  createdAt: string;
+  createdAt?: string;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -55,10 +57,10 @@ export function SosDispatchScreen() {
 
   const unresolved = reports
     .filter((r) => r.status !== "resolved")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   const resolved = reports
     .filter((r) => r.status === "resolved")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 
   async function advanceStatus(id: string, nextStatus: string) {
     setActingOn(id);
@@ -112,7 +114,10 @@ export function SosDispatchScreen() {
                   )}
                   {r.description ? <Text className="mt-1 text-sm text-gray-600">{r.description}</Text> : null}
                   <Text className="mt-1 text-xs text-gray-400">
-                    {r.location.lat.toFixed(4)}, {r.location.lng.toFixed(4)} · {new Date(r.createdAt).toLocaleString()}
+                    {r.location
+                      ? `${r.location.lat.toFixed(4)}, ${r.location.lng.toFixed(4)}`
+                      : "Location not provided — contact the reporter"}
+                    {r.createdAt ? ` · ${new Date(r.createdAt).toLocaleString()}` : ""}
                   </Text>
                   {action && (
                     <TouchableOpacity
@@ -139,7 +144,7 @@ export function SosDispatchScreen() {
           <View className="mt-2" style={{ gap: 6 }}>
             {resolved.map((r) => (
               <Text key={r.id} className="text-sm text-gray-500">
-                {TYPE_LABEL[r.type]} — {r.reporterName} — resolved {new Date(r.createdAt).toLocaleDateString()}
+                {TYPE_LABEL[r.type]} — {r.reporterName} — resolved {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}
               </Text>
             ))}
           </View>

@@ -13,9 +13,11 @@ interface SosReport {
   type: "trapped" | "missing_person" | "flood_rescue" | "other";
   peopleCount: number | null;
   description: string;
-  location: { lat: number; lng: number };
+  // Optional on purpose: an older or malformed record can lack coordinates, and one
+  // such report must not take down the whole dispatch board.
+  location?: { lat: number; lng: number };
   status: "pending" | "acknowledged" | "in_progress" | "resolved";
-  createdAt: string;
+  createdAt?: string;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -64,10 +66,10 @@ export default function AdminSos() {
 
   const unresolved = reports
     .filter((r) => r.status !== "resolved")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   const resolved = reports
     .filter((r) => r.status === "resolved")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 
   async function advanceStatus(id: string, nextStatus: string) {
     setActingOn(id);
@@ -97,10 +99,10 @@ export default function AdminSos() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {unresolved.map((r) => (
+          {unresolved.filter((r) => r.location).map((r) => (
             <CircleMarker
               key={r.id}
-              center={[r.location.lat, r.location.lng]}
+              center={[r.location!.lat, r.location!.lng]}
               radius={10}
               pathOptions={{ color: STATUS_COLOR[r.status], fillColor: STATUS_COLOR[r.status], fillOpacity: 0.7 }}
             >
@@ -145,7 +147,10 @@ export default function AdminSos() {
                   )}
                   {r.description && <p className="mt-1 text-sm text-gray-600">{r.description}</p>}
                   <p className="mt-1 text-xs text-gray-400">
-                    {r.location.lat.toFixed(4)}, {r.location.lng.toFixed(4)} · {new Date(r.createdAt).toLocaleString()}
+                    {r.location
+                      ? `${r.location.lat.toFixed(4)}, ${r.location.lng.toFixed(4)}`
+                      : "Location not provided — contact the reporter"}
+                    {r.createdAt && ` · ${new Date(r.createdAt).toLocaleString()}`}
                   </p>
                   {action && (
                     <button
@@ -169,7 +174,7 @@ export default function AdminSos() {
           <ul className="mt-3 space-y-2">
             {resolved.map((r) => (
               <li key={r.id} className="border-b border-gray-100 pb-2 text-sm text-gray-500 last:border-0 last:pb-0">
-                {TYPE_LABEL[r.type]} — {r.reporterName} — resolved {new Date(r.createdAt).toLocaleDateString()}
+                {TYPE_LABEL[r.type]} — {r.reporterName} — resolved {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}
               </li>
             ))}
           </ul>
