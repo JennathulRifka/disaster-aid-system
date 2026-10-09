@@ -296,7 +296,11 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
     // this feature, see CLAUDE.md).
     const neededByItem = Number(matchedItem?.quantity) || remainingBefore;
     const consumedQuantity = Math.min(remainingBefore, neededByItem);
-    const remainingAfter = remainingBefore - consumedQuantity;
+    // A legacy donation with no tracked quantity at all (remainingBefore is
+    // Infinity) has no real balance to carry forward — treat it as single-use
+    // (fully consumed by this match) rather than persisting Infinity, which
+    // poisons every district-inventory total it's counted in.
+    const remainingAfter = Number.isFinite(remainingBefore) ? remainingBefore - consumedQuantity : 0;
 
     const donationUpdate = {
       status: remainingAfter > 0 ? "available" : "matched",
