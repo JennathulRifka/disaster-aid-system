@@ -1,15 +1,27 @@
 
- RUN  v4.1.11 C:/Users/SINGER/Documents/GitHub/disaster-aid-system/web
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90mC:/Users/SINGER/Documents/GitHub/disaster-aid-system/web[39m
 
- ✓ src/lib/__tests__/districts.test.ts > DISTRICTS (client mirror) > has all 25 districts, matching the server's own list 3ms
- ✓ src/lib/__tests__/districts.test.ts > nearestDistrict > matches a point exactly at a district's own centroid to that district 1ms
- ✓ src/lib/__tests__/districts.test.ts > nearestDistrict > returns null for a missing/undefined location rather than throwing 0ms
- ✓ src/lib/__tests__/phone.test.ts > normalizeSriLankanPhone (client mirror) > normalizes common input formats to the same bare digit string 4ms
- ✓ src/lib/__tests__/phone.test.ts > normalizeSriLankanPhone (client mirror) > rejects landlines and garbage input 0ms
- ✓ src/lib/__tests__/phone.test.ts > normalizeSriLankanPhone (client mirror) > returns null for empty input 1ms
+ [32m✓[39m src/lib/__tests__/districts.test.ts[2m > [22mDISTRICTS (client mirror)[2m > [22mhas all 25 districts, matching the server's own list[32m 3[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/districts.test.ts[2m > [22mnearestDistrict[2m > [22mmatches a point exactly at a district's own centroid to that district[32m 1[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/districts.test.ts[2m > [22mnearestDistrict[2m > [22mreturns null for a missing/undefined location rather than throwing[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22mbearingDegrees[2m > [22mreturns compass bearings for the four directions[32m 4[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22mnearestPathIndex / remainingPathMeters[2m > [22mfinds the closest vertex and only searches forward[32m 1[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22mnearestPathIndex / remainingPathMeters[2m > [22msums the remaining distance (0.01 deg lng at 7N is ~1.1 km)[32m 1[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22mhaversineMeters[2m > [22mis zero for the same point and plausible Colombo-Kandy (~94 km)[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22mdistanceToPathMeters[2m > [22mis ~0 for a point on the line[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22mdistanceToPathMeters[2m > [22mmeasures perpendicular offset (~0.001 deg lat is ~111 m)[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22mdistanceToPathMeters[2m > [22mmeasures distance to the nearest endpoint past the end of the line[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22mdistanceToPathMeters[2m > [22mreturns Infinity for an empty path[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22madvanceStep[2m > [22mstays on the current maneuver until the vehicle has passed it[32m 1[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22madvanceStep[2m > [22madvances once the maneuver vertex is reached[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22madvanceStep[2m > [22mskips every maneuver already driven through, even if GPS jumped past them[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/navigation.test.ts[2m > [22madvanceStep[2m > [22mnever goes past the final step and never moves backwards[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/phone.test.ts[2m > [22mnormalizeSriLankanPhone (client mirror)[2m > [22mnormalizes common input formats to the same bare digit string[32m 6[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/phone.test.ts[2m > [22mnormalizeSriLankanPhone (client mirror)[2m > [22mrejects landlines and garbage input[32m 1[2mms[22m[39m
+ [32m✓[39m src/lib/__tests__/phone.test.ts[2m > [22mnormalizeSriLankanPhone (client mirror)[2m > [22mreturns null for empty input[32m 0[2mms[22m[39m
 
- Test Files  2 passed (2)
-      Tests  6 passed (6)
-   Start at  05:46:24
-   Duration  10.05s (transform 142ms, setup 0ms, import 5.29s, tests 16ms, environment 0ms)
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m   Start at [22m 12:14:40
+[2m   Duration [22m 30.78s[2m (transform 872ms, setup 0ms, import 1.22s, tests 34ms, environment 6ms)[22m
 
