@@ -213,6 +213,74 @@ router.get("/mine", requireAuth, requireRole("donor"), async (req, res) => {
 });
 
 /**
+ * The contended part of matching, done in one Firestore transaction: mark the
+ * request's first pending item for `category` as matched AND decrement the
+ * donation's remaining balance, atomically. Both documents are re-read inside
+ * the transaction (not trusted from the earlier query), so if another match
+ * call changed either one in between, Firestore retries this function against
+ * the fresh data and the checks below see the truth.
+ *
+ * Returns { ok: false, reason: "depleted" } if the donation has nothing left,
+ * { ok: false, reason: "taken" } if the request/item is no longer eligible,
+ * else { ok: true, consumedQuantity, remainingAfter }.
+ *
+ * The request-side item is still all-or-nothing on purpose (deferred,
+ * confirmed scope — see "Donation leftover-quantity tracking" in CLAUDE.md):
+ * the item is marked fully "matched" regardless of whether this donation can
+ * cover its full quantity. Only the DONATION's own balance is quantity-aware:
+ * never consume more than it has left or than the item needs; the rest stays
+ * as remainingQuantity and the donation stays "available" so it can be matched
+ * again later for a different request.
+ *
+ * The delivery/chat/notification side effects stay outside the transaction
+ * (they're not contended and Firestore transactions must not do slow,
+ * non-idempotent work like sending messages).
+ */
+async function claimMatch(donationRef, requestId, category, donationId, now) {
+  const requestRef = db.collection("aidRequests").doc(requestId);
+  return db.runTransaction(async (tx) => {
+    const donationSnap = await tx.get(donationRef);
+    const requestSnap = await tx.get(requestRef);
+
+    const donationNow = donationSnap.data() || {};
+    const remainingBefore = donationNow.remainingQuantity ?? donationNow.quantityValue ?? Infinity;
+    if (remainingBefore <= 0) return { ok: false, reason: "depleted" };
+
+    const request = requestSnap.exists ? requestSnap.data() : null;
+    const matchedItem = request?.items?.find((item) => item.category === category && item.status === "pending");
+    if (!request || !REQUESTABLE_STATUSES.includes(request.status) || !matchedItem) {
+      return { ok: false, reason: "taken" };
+    }
+
+    const updatedItems = request.items.map((item) =>
+      item === matchedItem ? { ...item, status: "matched", donationId } : item
+    );
+
+    const neededByItem = Number(matchedItem.quantity) || remainingBefore;
+    const consumedQuantity = Math.min(remainingBefore, neededByItem);
+    // A legacy donation with no tracked quantity at all (remainingBefore is
+    // Infinity) has no real balance to carry forward — treat it as single-use
+    // (fully consumed by this match) rather than persisting Infinity, which
+    // poisons every district-inventory total it's counted in.
+    const remainingAfter = Number.isFinite(remainingBefore) ? remainingBefore - consumedQuantity : 0;
+
+    tx.update(requestRef, {
+      items: updatedItems,
+      status: computeOverallStatus(updatedItems),
+      updatedAt: now,
+    });
+    tx.update(donationRef, {
+      status: remainingAfter > 0 ? "available" : "matched",
+      remainingQuantity: remainingAfter,
+      matchedRequestId: requestId,
+      updatedAt: now,
+    });
+
+    return { ok: true, consumedQuantity, remainingAfter };
+  });
+}
+
+/**
  * POST /api/donations/:id/match
  * Admin: match a donation to the best waiting request that still needs this
  * donation's category — scored by highest priority first, then closest
@@ -264,43 +332,33 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
       return res.status(404).json({ error: "No verified requests still need this donation's category." });
     }
 
-    const bestMatch = candidates[0];
+    // Claim the match atomically (see claimMatch below): re-reads the
+    // donation and the chosen request inside a Firestore transaction, so two
+    // concurrent match calls can never both take the same request item or
+    // both spend the same donation balance. If another admin/request got
+    // there first, fall through to the next-best candidate rather than fail.
     const now = new Date().toISOString();
-
-    // The request-side item is still all-or-nothing on purpose (deferred,
-    // confirmed scope — see "Donation leftover-quantity tracking" in
-    // CLAUDE.md): whichever pending item first matches this category gets
-    // marked fully "matched" here regardless of whether this donation can
-    // actually cover its full quantity. Only the DONATION's own remaining
-    // balance is quantity-aware below.
-    const matchedItem = bestMatch.items.find(
-      (item) => item.category === donation.category && item.status === "pending"
-    );
-    const updatedItems = bestMatch.items.map((item) =>
-      item === matchedItem ? { ...item, status: "matched", donationId: req.params.id } : item
-    );
-    const newRequestStatus = computeOverallStatus(updatedItems);
-
-    await db.collection("aidRequests").doc(bestMatch.id).update({
-      items: updatedItems,
-      status: newRequestStatus,
-      updatedAt: now,
-    });
-
-    // The actual leftover-tracking math: never consume more than the
-    // donation actually has left, or more than this one request item
-    // needs. Whichever is smaller is what this match actually uses; the
-    // rest (if any) stays on the donation as remainingQuantity, and the
-    // donation stays "available" — not "matched" — so it can be matched
-    // again later for a different request (the user's explicit choice for
-    // this feature, see CLAUDE.md).
-    const neededByItem = Number(matchedItem?.quantity) || remainingBefore;
-    const consumedQuantity = Math.min(remainingBefore, neededByItem);
-    // A legacy donation with no tracked quantity at all (remainingBefore is
-    // Infinity) has no real balance to carry forward — treat it as single-use
-    // (fully consumed by this match) rather than persisting Infinity, which
-    // poisons every district-inventory total it's counted in.
-    const remainingAfter = Number.isFinite(remainingBefore) ? remainingBefore - consumedQuantity : 0;
+    let claim = null;
+    let bestMatch = null;
+    for (const candidate of candidates) {
+      const result = await claimMatch(donationRef, candidate.id, donation.category, req.params.id, now);
+      if (result.ok) {
+        claim = result;
+        bestMatch = candidate;
+        break;
+      }
+      if (result.reason === "depleted") {
+        return res.status(409).json({ error: "This donation was just matched elsewhere and has no quantity left." });
+      }
+      // reason === "taken": that request item was matched by someone else
+      // first — try the next candidate.
+    }
+    if (!claim) {
+      return res
+        .status(409)
+        .json({ error: "Every waiting request for this category was just matched by someone else. Try again." });
+    }
+    const { consumedQuantity, remainingAfter } = claim;
 
     const donationUpdate = {
       status: remainingAfter > 0 ? "available" : "matched",
