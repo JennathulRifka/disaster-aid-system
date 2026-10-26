@@ -271,7 +271,6 @@ export function SosButton() {
                   >
                     <Text className="text-xs font-semibold text-red-800 underline">{t("sos.hotline")}</Text>
                   </TouchableOpacity>
-                  <Text className="mt-1 text-xs text-red-700">{t("sos.disclaimer")}</Text>
                 </View>
 
                 <View className="flex-row flex-wrap" style={{ gap: 8 }} accessibilityRole="radiogroup">

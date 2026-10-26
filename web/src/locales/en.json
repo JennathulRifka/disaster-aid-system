@@ -38,7 +38,6 @@
     "modalTitle": "Emergency SOS",
     "modalSubtitle": "For life-threatening emergencies only. Use Submit Request for food or medicine.",
     "hotline": "In immediate danger? Call the DMC hotline 117 now.",
-    "disclaimer": "This app is a supplementary alert channel. Reports are reviewed by administrators and a response is not guaranteed. Do not rely on it alone in a life-threatening emergency.",
     "type": {
       "trapped": "Trapped",
       "missing_person": "Missing Person",

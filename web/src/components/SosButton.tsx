@@ -133,12 +133,9 @@ export function SosButton() {
 
                 {/* Legal/safety note: this app supplements, never replaces, the DMC
                     hotline — shown before the user relies on it, not buried. */}
-                <div className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
-                  <p className="font-semibold">
-                    <a href="tel:117" className="underline">{t("sos.hotline")}</a>
-                  </p>
-                  <p className="mt-1 text-red-700">{t("sos.disclaimer")}</p>
-                </div>
+                <p className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-800">
+                  <a href="tel:117" className="underline">{t("sos.hotline")}</a>
+                </p>
 
                 <div className="grid grid-cols-2 gap-2" role="group" aria-label={t("sos.modalTitle")}>
                   {SOS_TYPE_KEYS.map((key) => (
