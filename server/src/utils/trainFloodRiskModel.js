@@ -145,22 +145,14 @@ async function trainFloodRiskModel({ onProgress = () => {} } = {}) {
   }
   onProgress(`Loaded ${rawRecords.length} raw records -> ${floodMonths.size} distinct district-months with a reported flood.`);
 
-  // Each district's overall historical flood-month frequency (across every
-  // month/year in the training window) — a per-district propensity signal.
-  // See the header comment in the old script (and CLAUDE.md's "Flood risk
-  // forecast (ML)" section) for why this is included despite the soft
-  // data-leakage tradeoff it carries.
-  const totalYearsMonths = (TRAIN_END_YEAR - TRAIN_START_YEAR + 1) * 12;
-  const districtOverallRate = {};
-  for (const district of DISTRICTS) {
-    let positives = 0;
-    for (let year = TRAIN_START_YEAR; year <= TRAIN_END_YEAR; year++) {
-      for (let month = 1; month <= 12; month++) {
-        if (floodMonths.has(`${district.name}|${year}|${month}`)) positives++;
-      }
-    }
-    districtOverallRate[district.name] = positives / totalYearsMonths;
-  }
+  // NOTE: an earlier version also fed each district's overall historical flood
+  // frequency in as a fourth/fifth feature. A temporal held-out evaluation
+  // (scripts/evaluate-flood-model-heldout.js: train 1981-2010, test 2011-2019)
+  // showed that feature does not generalise — the label it is computed from
+  // leaks into the training fit, and flood reporting in the records grew over
+  // time — and removing it improved held-out AUC and Brier score. It has been
+  // removed; per-district-per-month history is still stored below
+  // (districtMonthBaseRate) purely to display "why" next to a risk score.
 
   const samples = []; // { district, year, month, features: [...], label }
 
@@ -178,7 +170,7 @@ async function trainFloodRiskModel({ onProgress = () => {} } = {}) {
           district: district.name,
           year,
           month,
-          features: [monthTotalMm, prior30dMm, Math.sin(monthAngle), Math.cos(monthAngle), districtOverallRate[district.name]],
+          features: [monthTotalMm, prior30dMm, Math.sin(monthAngle), Math.cos(monthAngle)],
           label,
         });
       }
@@ -235,7 +227,7 @@ async function trainFloodRiskModel({ onProgress = () => {} } = {}) {
   );
 
   const model = {
-    version: 1,
+    version: 2,
     trainedAt: new Date().toISOString(),
     trainingWindow: { startYear: TRAIN_START_YEAR, endYear: TRAIN_END_YEAR },
     sampleCount: samples.length,
@@ -243,13 +235,12 @@ async function trainFloodRiskModel({ onProgress = () => {} } = {}) {
     inSampleAccuracy: accuracy,
     topDecilePrecision,
     baseRate,
-    featureNames: ["monthTotalRainfallMm", "prior30dRainfallMm", "monthSin", "monthCos", "districtOverallRate"],
+    featureNames: ["monthTotalRainfallMm", "prior30dRainfallMm", "monthSin", "monthCos"],
     featureMeans: means,
     featureStds: stds,
     weights,
     bias,
     districtMonthBaseRate,
-    districtOverallRate,
     sources: [
       "UNDRR DesInventar Sri Lanka (https://www.desinventar.net) - historical flood incident reports, 1981-2020",
       "NASA POWER Daily API (https://power.larc.nasa.gov) - historical daily precipitation, MERRA2/GEOS reanalysis",

@@ -1,44 +1,40 @@
 {
-  "version": 1,
-  "trainedAt": "2026-09-29T11:19:26.515Z",
+  "version": 2,
+  "trainedAt": "2026-10-26T18:19:39.995Z",
   "trainingWindow": {
     "startYear": 1981,
     "endYear": 2020
   },
   "sampleCount": 12000,
   "positiveCount": 1175,
-  "inSampleAccuracy": 0.90275,
-  "topDecilePrecision": 0.37583333333333335,
+  "inSampleAccuracy": 0.9036666666666666,
+  "topDecilePrecision": 0.37916666666666665,
   "baseRate": 0.09791666666666667,
   "featureNames": [
     "monthTotalRainfallMm",
     "prior30dRainfallMm",
     "monthSin",
-    "monthCos",
-    "districtOverallRate"
+    "monthCos"
   ],
   "featureMeans": [
     118.00998750000076,
     115.67219916666738,
     3.69889304370948e-17,
-    -3.7016686012710425e-17,
-    0.09791666666666561
+    -3.7016686012710425e-17
   ],
   "featureStds": [
     103.82120460359492,
     102.10731677589033,
     0.7071067811865476,
-    0.7071067811865476,
-    0.03845993586404734
+    0.7071067811865476
   ],
   "weights": [
-    0.8041778878357293,
-    0.281689677337522,
-    0.04551551790216204,
-    0.03084667889848567,
-    0.3897761918563638
+    0.7999685312912348,
+    0.30210195876796864,
+    0.06328014321354444,
+    -0.018833473009298562
   ],
-  "bias": -2.680602841376473,
+  "bias": -2.594124116930083,
   "districtMonthBaseRate": {
     "Colombo": {
       "1": 0.025,
@@ -390,33 +386,6 @@
       "11": 0.1,
       "12": 0.075
     }
-  },
-  "districtOverallRate": {
-    "Colombo": 0.11666666666666667,
-    "Gampaha": 0.13333333333333333,
-    "Kalutara": 0.15,
-    "Kandy": 0.09166666666666666,
-    "Matale": 0.05,
-    "Nuwara Eliya": 0.11041666666666666,
-    "Galle": 0.13333333333333333,
-    "Matara": 0.10625,
-    "Hambantota": 0.09166666666666666,
-    "Jaffna": 0.09166666666666666,
-    "Kilinochchi": 0.09166666666666666,
-    "Mannar": 0.04583333333333333,
-    "Vavuniya": 0.03958333333333333,
-    "Mullaitivu": 0.04791666666666667,
-    "Batticaloa": 0.11875,
-    "Ampara": 0.12083333333333333,
-    "Trincomalee": 0.08541666666666667,
-    "Kurunegala": 0.1375,
-    "Puttalam": 0.10625,
-    "Anuradhapura": 0.06666666666666667,
-    "Polonnaruwa": 0.07916666666666666,
-    "Badulla": 0.05416666666666667,
-    "Monaragala": 0.07916666666666666,
-    "Ratnapura": 0.21458333333333332,
-    "Kegalle": 0.08541666666666667
   },
   "sources": [
     "UNDRR DesInventar Sri Lanka (https://www.desinventar.net) - historical flood incident reports, 1981-2020",

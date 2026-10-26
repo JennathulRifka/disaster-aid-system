@@ -1,7 +1,7 @@
 # Flood Risk Model — Test Results
 
-Generated: 2026-09-29T11:19:26.926Z
-Model trained: 2026-09-29T11:19:26.515Z (training window 1981-2020)
+Generated: 2026-10-26T18:19:40.297Z
+Model trained: 2026-10-26T18:19:39.995Z (training window 1981-2020)
 
 ## 1. Data integrity
 
@@ -17,29 +17,29 @@ Model trained: 2026-09-29T11:19:26.515Z (training window 1981-2020)
 | Metric | Value |
 |---|---|
 | Training samples | 12000 (1175 positive, 9.8%) |
-| In-sample accuracy (0.5 threshold) | 90.3% |
-| Top-decile precision | 37.6% vs. 9.8% base rate (3.8x) |
+| In-sample accuracy (0.5 threshold) | 90.4% |
+| Top-decile precision | 37.9% vs. 9.8% base rate (3.9x) |
 
 ## 3. Confusion matrix (probability threshold = 0.5)
 
 | | Predicted flood | Predicted no flood |
 |---|---|---|
-| **Actual flood** | TP = 146 | FN = 1029 |
-| **Actual no flood** | FP = 138 | TN = 10687 |
+| **Actual flood** | TP = 140 | FN = 1035 |
+| **Actual no flood** | FP = 121 | TN = 10704 |
 
 | Metric | Value |
 |---|---|
-| Precision | 51.4% |
-| Recall | 12.4% |
-| F1 score | 20.0% |
-| Accuracy | 90.3% |
+| Precision | 53.6% |
+| Recall | 11.9% |
+| F1 score | 19.5% |
+| Accuracy | 90.4% |
 | Baseline accuracy ("always predict no flood") | 90.2% |
 
-**Reading this honestly**: raw accuracy is barely above the always-predict-negative baseline, because only ~10% of district-months in the training data ever had a reported flood — this is the same class-imbalance issue already documented for top-decile precision. Precision/recall/F1 at the 0.5 threshold are included here for completeness (a standard classification report), but the model's real, demonstrated skill is in *ranking* risk (top-decile precision, 3.8x the base rate), not in a binary yes/no call at 0.5.
+**Reading this honestly**: raw accuracy is barely above the always-predict-negative baseline, because only ~10% of district-months in the training data ever had a reported flood — this is the same class-imbalance issue already documented for top-decile precision. Precision/recall/F1 at the 0.5 threshold are included here for completeness (a standard classification report), but the model's real, demonstrated skill is in *ranking* risk (top-decile precision, 3.9x the base rate), not in a binary yes/no call at 0.5.
 
 ## 3b. ROC curve and AUC
 
-**AUC = 0.825** (0.5 = no better than random guessing, 1.0 = perfect ranking).
+**AUC = 0.809** (0.5 = no better than random guessing, 1.0 = perfect ranking).
 
 Unlike the confusion matrix above, ROC/AUC doesn't depend on picking one threshold — it evaluates the model's ability to rank a genuinely-flooded district-month above a non-flooded one, across every possible threshold at once. This is the standard way classification models are compared when the decision threshold is a design choice rather than a fixed requirement, and it's the metric most directly comparable to what a Random Forest or LSTM classifier in this same evaluation would report.
 
@@ -53,7 +53,7 @@ Unlike the confusion matrix above, ROC/AUC doesn't depend on picking one thresho
   - Ratnapura/May = 0.475, Mannar/February = 0.025
 - **PASS**: Every district-month historical base rate is a valid probability [0,1]
 - **PASS**: All trained weights and the bias are finite numbers (no NaN/Infinity — training didn't diverge)
-  - weights = [0.8042, 0.2817, 0.0455, 0.0308, 0.3898], bias = -2.6806
+  - weights = [0.8000, 0.3021, 0.0633, -0.0188], bias = -2.5941
 
 ## 5. Riskiest and safest district-months (qualitative check)
 

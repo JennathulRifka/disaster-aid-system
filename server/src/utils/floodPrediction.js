@@ -163,9 +163,8 @@ async function predictAllDistricts() {
       const recentRate = recentAverageDailyRate(dailySeries, now);
       const { projectedTotalMm, soFarMm, countedDays, usedFallbackRate } = currentMonthProjectedTotal(dailySeries, now, recentRate);
       const prior30dMm = prior30dTotal(dailySeries, monthStart);
-      const districtRate = model.districtOverallRate[district.name] ?? 0;
 
-      const probability = predictFromFeatures([projectedTotalMm, prior30dMm, Math.sin(monthAngle), Math.cos(monthAngle), districtRate]);
+      const probability = predictFromFeatures([projectedTotalMm, prior30dMm, Math.sin(monthAngle), Math.cos(monthAngle)]);
       const historicalMonthRate = model.districtMonthBaseRate[district.name]?.[month] ?? null;
 
       results.push({

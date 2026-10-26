@@ -1,0 +1,142 @@
+{
+  "generatedAt": "2026-10-26T18:22:51.279Z",
+  "split": {
+    "train": "1981-2010",
+    "test": "2011-2019",
+    "trainSamples": 9000,
+    "testSamples": 2700,
+    "trainPositiveRate": 0.08655555555555555,
+    "testPositiveRate": 0.14629629629629629
+  },
+  "hyperparameters": {
+    "epochs": 3000,
+    "lr": 0.3,
+    "l2": 0.001,
+    "standardisation": "z-score (train stats)",
+    "classWeighting": "none"
+  },
+  "features": [
+    "monthRainfallMm",
+    "prior30dRainfallMm",
+    "monthSin",
+    "monthCos"
+  ],
+  "model": {
+    "weights": [
+      0.7432936460461214,
+      0.4256575118852255,
+      0.12325769050245584,
+      0.012470406905353268
+    ],
+    "bias": -2.769401623164037,
+    "auc": 0.786719569455504,
+    "averagePrecision": 0.39737498427308643,
+    "brier": 0.11133054451793477,
+    "topDecilePrecision": 0.45185185185185184
+  },
+  "baselines": {
+    "climatologyDistrictMonth": {
+      "auc": 0.6872209560943463,
+      "averagePrecision": 0.2665037034857046,
+      "brier": 0.12283086419753113,
+      "topDecilePrecision": 0.3
+    },
+    "climatologyMonthOnly": {
+      "auc": 0.7200637030121639,
+      "averagePrecision": 0.27757668580241573,
+      "brier": 0.12065920987654355,
+      "topDecilePrecision": 0.32592592592592595
+    },
+    "constantTrainRate": {
+      "brier": 0.1284626460905284
+    }
+  },
+  "ablation": {
+    "without_monthRainfallMm": {
+      "auc": 0.6933584118180071,
+      "averagePrecision": 0.24470971194468713,
+      "brier": 0.1278393521335086,
+      "topDecilePrecision": 0.29259259259259257
+    },
+    "without_prior30dRainfallMm": {
+      "auc": 0.7900914357890112,
+      "averagePrecision": 0.4311328098832349,
+      "brier": 0.10492092606607013,
+      "topDecilePrecision": 0.5037037037037037
+    },
+    "without_monthSin": {
+      "auc": 0.7883472912490733,
+      "averagePrecision": 0.3966646865771335,
+      "brier": 0.11103383646049386,
+      "topDecilePrecision": 0.45185185185185184
+    },
+    "without_monthCos": {
+      "auc": 0.7870490677942832,
+      "averagePrecision": 0.3974640363551863,
+      "brier": 0.11134436668057811,
+      "topDecilePrecision": 0.45185185185185184
+    }
+  },
+  "calibration": [
+    {
+      "bin": "0-0.1",
+      "n": 1566,
+      "meanPredicted": 0.04668479275383513,
+      "observedRate": 0.06002554278416347
+    },
+    {
+      "bin": "0.1-0.2",
+      "n": 460,
+      "meanPredicted": 0.1410981137795757,
+      "observedRate": 0.11956521739130435
+    },
+    {
+      "bin": "0.2-0.3",
+      "n": 166,
+      "meanPredicted": 0.24423238173253328,
+      "observedRate": 0.1927710843373494
+    },
+    {
+      "bin": "0.3-0.4",
+      "n": 124,
+      "meanPredicted": 0.35452581987885945,
+      "observedRate": 0.3951612903225806
+    },
+    {
+      "bin": "0.4-0.5",
+      "n": 110,
+      "meanPredicted": 0.45466994508037645,
+      "observedRate": 0.38181818181818183
+    },
+    {
+      "bin": "0.5-0.6",
+      "n": 99,
+      "meanPredicted": 0.546348514315915,
+      "observedRate": 0.3939393939393939
+    },
+    {
+      "bin": "0.6-0.7",
+      "n": 57,
+      "meanPredicted": 0.6419485369363033,
+      "observedRate": 0.3333333333333333
+    },
+    {
+      "bin": "0.7-0.8",
+      "n": 54,
+      "meanPredicted": 0.742813937397095,
+      "observedRate": 0.48148148148148145
+    },
+    {
+      "bin": "0.8-0.9",
+      "n": 33,
+      "meanPredicted": 0.8505066252857606,
+      "observedRate": 0.6666666666666666
+    },
+    {
+      "bin": "0.9-1",
+      "n": 31,
+      "meanPredicted": 0.9564936603673476,
+      "observedRate": 0.5483870967741935
+    }
+  ]
+}
