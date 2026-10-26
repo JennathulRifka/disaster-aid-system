@@ -1,0 +1,120 @@
+{
+  "runCount": 4,
+  "doubleMatchedItemsTotal": 0,
+  "phases": [
+    {
+      "phase": "1. Submit requests",
+      "runs": 4,
+      "requests": 120,
+      "successRate": 1,
+      "p50": {
+        "mean": 7541,
+        "sd": 5091
+      },
+      "p95": {
+        "mean": 8069,
+        "sd": 5495
+      },
+      "p99": {
+        "mean": 8118,
+        "sd": 5477
+      },
+      "max": 16130
+    },
+    {
+      "phase": "1b. Approve requests",
+      "runs": 4,
+      "requests": 120,
+      "successRate": 1,
+      "p50": {
+        "mean": 5277,
+        "sd": 3924
+      },
+      "p95": {
+        "mean": 5621,
+        "sd": 4220
+      },
+      "p99": {
+        "mean": 5658,
+        "sd": 4193
+      },
+      "max": 11932
+    },
+    {
+      "phase": "2. Register donations",
+      "runs": 4,
+      "requests": 120,
+      "successRate": 1,
+      "p50": {
+        "mean": 2846,
+        "sd": 2425
+      },
+      "p95": {
+        "mean": 3164,
+        "sd": 2593
+      },
+      "p99": {
+        "mean": 3262,
+        "sd": 2765
+      },
+      "max": 7408
+    },
+    {
+      "phase": "3. Match donations (race probe)",
+      "runs": 4,
+      "requests": 120,
+      "successRate": 1,
+      "p50": {
+        "mean": 52496,
+        "sd": 53746
+      },
+      "p95": {
+        "mean": 89251,
+        "sd": 58343
+      },
+      "p99": {
+        "mean": 93351,
+        "sd": 57199
+      },
+      "max": 167214
+    },
+    {
+      "phase": "4. Volunteers accept",
+      "runs": 4,
+      "requests": 57,
+      "successRate": 1,
+      "p50": {
+        "mean": 8597,
+        "sd": 4242
+      },
+      "p95": {
+        "mean": 9149,
+        "sd": 4782
+      },
+      "p99": {
+        "mean": 9149,
+        "sd": 4782
+      },
+      "max": 14679
+    },
+    {
+      "phase": "5. Read burst",
+      "runs": 4,
+      "requests": 200,
+      "successRate": 1,
+      "p50": {
+        "mean": 2415,
+        "sd": 1877
+      },
+      "p95": {
+        "mean": 2941,
+        "sd": 2559
+      },
+      "p99": {
+        "mean": 2942,
+        "sd": 2559
+      },
+      "max": 6542
+    }
+  ]
+}

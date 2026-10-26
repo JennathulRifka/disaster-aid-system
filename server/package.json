@@ -40,7 +40,12 @@
     "ignore": [
       "src/data/*.json",
       "backups/*",
-      "ml-evaluation-report.*"
+      "ml-evaluation-report.*",
+      "ml-heldout-report.*",
+      "load-test*",
+      "api-integration-test-report.*",
+      "firestore-rules-test-report.*",
+      "scripts/*"
     ]
   }
 }

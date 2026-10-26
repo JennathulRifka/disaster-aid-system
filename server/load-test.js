@@ -6,12 +6,23 @@
 // request item), then deletes every trace of itself.
 
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 const { db, auth } = require("./src/config/firebase");
 
-const API_BASE = "http://localhost:5000";
+// Target of the test. Default: the local dev server. To load-test the deployed
+// site instead (same Firebase project, so the same throwaway accounts/cleanup
+// work unchanged):
+//     LOAD_TEST_API_BASE=https://disaster-aid-system.vercel.app node load-test.js
+// Results from a non-local target are saved separately (load-test-runs-vercel.json)
+// so local and deployed numbers are never averaged together.
+const API_BASE = (process.env.LOAD_TEST_API_BASE || "http://localhost:5000").replace(/\/$/, "");
+const IS_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(API_BASE);
+const RUNS_FILE = IS_LOCAL ? "load-test-runs.json" : "load-test-runs-vercel.json";
 const FIREBASE_API_KEY = "AIzaSyCFeOCGBgocBZ7ZBu7lfdjdc-zhKHSZ8p4";
 const TEST_PREFIX = "loadtest";
 const RUN_ID = Date.now();
+const RUN_START_ISO = new Date(RUN_ID - 1000).toISOString();
 
 const VICTIM_COUNT = 30;
 const DONOR_COUNT = 30;
@@ -86,26 +97,71 @@ function stats(results) {
   const ok = results.filter((r) => r.ok);
   const failed = results.filter((r) => !r.ok);
   const times = ok.map((r) => r.ms).sort((a, b) => a - b);
-  const pct = (p) => (times.length ? times[Math.min(times.length - 1, Math.floor((p / 100) * times.length))] : 0);
+  // Nearest-rank percentile on the sorted successful latencies.
+  const pct = (p) => (times.length ? times[Math.min(times.length - 1, Math.max(0, Math.ceil((p / 100) * times.length) - 1))] : 0);
+  const mean = times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0;
+  const sd = times.length > 1 ? Math.sqrt(times.reduce((a, b) => a + (b - mean) ** 2, 0) / (times.length - 1)) : 0;
   return {
     total: results.length,
     succeeded: ok.length,
     failed: failed.length,
     failureReasons: failed.slice(0, 5).map((r) => ({ status: r.status, error: r.error || r.body?.error })),
     minMs: times.length ? Math.round(times[0]) : 0,
-    avgMs: times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : 0,
+    avgMs: Math.round(mean),
+    sdMs: Math.round(sd),
+    p50Ms: Math.round(pct(50)),
     p95Ms: Math.round(pct(95)),
+    p99Ms: Math.round(pct(99)),
     maxMs: times.length ? Math.round(times[times.length - 1]) : 0,
   };
 }
 
-function randomLocation() {
-  // Scattered around Colombo/Gampaha area, real Sri Lanka coordinates.
-  return { lat: 6.8 + Math.random() * 0.4, lng: 79.8 + Math.random() * 0.4 };
+// Every phase's stats are kept so the run can be written to disk and
+// aggregated across repeated runs (run-to-run variance), not just printed.
+const phaseStats = [];
+function record(label, results, extra = {}) {
+  const st = stats(results);
+  phaseStats.push({ phase: label, ...st, ...extra });
+  console.log(JSON.stringify(st, null, 2), "\n");
+  return st;
+}
+
+function writeRunReport(doubleMatchedItems) {
+  const file = path.join(__dirname, RUNS_FILE);
+  let runs = [];
+  try { runs = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* first run */ }
+  runs.push({ runId: RUN_ID, at: new Date().toISOString(), target: API_BASE, doubleMatchedItems, phases: phaseStats });
+  fs.writeFileSync(file, JSON.stringify(runs, null, 2));
+  console.log("Saved run to " + RUNS_FILE + " (" + runs.length + " run(s) on file). Aggregate with: node scripts/aggregate-load-tests.js" + (IS_LOCAL ? "" : " vercel"));
+}
+
+// Donations and volunteers are placed in an ocean box south-west of Sri Lanka
+// (lat 5.5-6.5, lng 78-79; the nearest coast is ~90 km east), never on land.
+// Auto-assignment picks the nearest available volunteer by distance, so test
+// volunteers on a grid inside the box (nearest one is always within ~30 km of
+// any donation in it) always beat any real volunteer on land — test deliveries
+// and their "new delivery assignment" push notifications never reach real
+// people. Donations are random within the box (not one shared point) so the
+// 30 concurrent matches don't all contend for the same request in the same
+// order, which would measure an artificial worst case.
+const OCEAN_BOX = { latMin: 5.5, latMax: 6.5, lngMin: 78, lngMax: 79 };
+function oceanLocation() {
+  return {
+    lat: OCEAN_BOX.latMin + Math.random() * (OCEAN_BOX.latMax - OCEAN_BOX.latMin),
+    lng: OCEAN_BOX.lngMin + Math.random() * (OCEAN_BOX.lngMax - OCEAN_BOX.lngMin),
+  };
+}
+// 5 x 3 grid of volunteer positions across the box (15 volunteers).
+function gridVolunteerLocation(i) {
+  const col = i % 5, row = Math.floor(i / 5);
+  return {
+    lat: OCEAN_BOX.latMin + ((row + 0.5) / 3) * (OCEAN_BOX.latMax - OCEAN_BOX.latMin),
+    lng: OCEAN_BOX.lngMin + ((col + 0.5) / 5) * (OCEAN_BOX.lngMax - OCEAN_BOX.lngMin),
+  };
 }
 
 async function main() {
-  console.log(`=== Concurrent load test run ${RUN_ID} ===\n`);
+  console.log(`=== Concurrent load test run ${RUN_ID} against ${API_BASE} ===\n`);
 
   console.log(`Creating ${VICTIM_COUNT} victims, ${DONOR_COUNT} donors, ${VOLUNTEER_COUNT} volunteers, 1 admin...`);
   const t0 = performance.now();
@@ -116,7 +172,7 @@ async function main() {
     Array.from({ length: DONOR_COUNT }, (_, i) => createAccount("donor", i))
   );
   const volunteers = await Promise.all(
-    Array.from({ length: VOLUNTEER_COUNT }, (_, i) => createAccount("volunteer", i, { location: randomLocation() }))
+    Array.from({ length: VOLUNTEER_COUNT }, (_, i) => createAccount("volunteer", i, { location: gridVolunteerLocation(i) }))
   );
   const [admin1] = await Promise.all([createAccount("admin", 0)]);
   console.log(`Account setup done in ${Math.round(performance.now() - t0)}ms\n`);
@@ -133,14 +189,14 @@ async function main() {
           severity: "high",
           peopleAffected: 3,
           vulnerableGroups: [],
-          location: randomLocation(),
+          location: oceanLocation(),
           notes: "load test",
         }),
       })
     )
   );
   requestResults.forEach((r) => r.body?.id && createdDocs.aidRequests.push(r.body.id));
-  console.log(JSON.stringify(stats(requestResults), null, 2), "\n");
+  record("1. Submit requests", requestResults);
 
   // Admin approves every request that was created, concurrently.
   console.log(`--- Admin approving ${createdDocs.aidRequests.length} requests concurrently ---`);
@@ -152,7 +208,7 @@ async function main() {
       })
     )
   );
-  console.log(JSON.stringify(stats(verifyResults), null, 2), "\n");
+  record("1b. Approve requests", verifyResults);
 
   // ---- Phase 2: concurrent donation registration (all donors, same instant) ----
   console.log(`--- Phase 2: ${DONOR_COUNT} donors registering donations concurrently ---`);
@@ -164,7 +220,7 @@ async function main() {
           category: "water",
           quantity: "2 bottles",
           quantityValue: 2,
-          location: randomLocation(),
+          location: oceanLocation(),
           deliveryMethod: "volunteer",
           notes: "load test",
         }),
@@ -172,7 +228,7 @@ async function main() {
     )
   );
   donationResults.forEach((r) => r.body?.id && createdDocs.donations.push(r.body.id));
-  console.log(JSON.stringify(stats(donationResults), null, 2), "\n");
+  record("2. Register donations", donationResults);
 
   // ---- Phase 3: the real race-condition probe. Match every donation to a
   // request CONCURRENTLY (not sequentially) — this is where a bug would
@@ -183,12 +239,17 @@ async function main() {
     createdDocs.donations.map((id) => timedFetch(`/api/donations/${id}/match`, admin1.token, { method: "POST" }))
   );
   matchResults.forEach((r) => r.body?.deliveryId && createdDocs.deliveries.push(r.body.deliveryId));
-  console.log(JSON.stringify(stats(matchResults), null, 2), "\n");
+  record("3. Match donations (race probe)", matchResults);
 
   // ---- Data integrity check: did any request item get matched to more
   // than one donation? Did any donation end up matched to a request whose
   // item was already taken? ----
   console.log(`--- Integrity check ---`);
+  if (createdDocs.aidRequests.length === 0) {
+    // getAll() throws on zero arguments — an earlier phase producing nothing
+    // (e.g. the server being unreachable) should fail clearly, not here.
+    throw new Error("No requests were created — server unreachable or Phase 1 failed entirely.");
+  }
   const reqSnap = await db.getAll(...createdDocs.aidRequests.map((id) => db.collection("aidRequests").doc(id)));
   const donationIdsSeen = new Map(); // donationId -> count of items referencing it
   let doubleMatchedItems = 0;
@@ -227,15 +288,18 @@ async function main() {
     // Deliveries were auto-assigned by the nearest-volunteer algorithm at
     // match time — look up who each one actually belongs to before accepting.
     const deliveryDocs = await db.getAll(...acceptable.map((id) => db.collection("deliveries").doc(id)));
-    const acceptResults = await Promise.all(
+    let skippedRealVolunteer = 0;
+    const acceptResultsRaw = await Promise.all(
       deliveryDocs.map((doc) => {
         if (!doc.exists) return Promise.resolve({ ok: false, ms: 0, status: 0, error: "delivery not found" });
         const assignedVolunteer = volunteers.find((v) => v.uid === doc.data().volunteerId);
-        if (!assignedVolunteer) return Promise.resolve({ ok: false, ms: 0, status: 0, error: "no matching volunteer" });
+        if (!assignedVolunteer) { skippedRealVolunteer++; return Promise.resolve(null); }
         return timedFetch(`/api/deliveries/${doc.id}/accept`, assignedVolunteer.token, { method: "PATCH" });
       })
     );
-    console.log(JSON.stringify(stats(acceptResults), null, 2), "\n");
+    const acceptResults = acceptResultsRaw.filter(Boolean); // null = went to a real volunteer, excluded
+    if (skippedRealVolunteer) console.log("  (" + skippedRealVolunteer + " delivery(ies) auto-assigned to a real volunteer account - excluded)");
+    record("4. Volunteers accept", acceptResults, { skippedRealVolunteerDeliveries: skippedRealVolunteer });
   }
 
   // ---- Phase 5: read-heavy burst ----
@@ -246,15 +310,28 @@ async function main() {
       return timedFetch(endpoints[i % endpoints.length], null);
     })
   );
-  console.log(JSON.stringify(stats(readResults), null, 2), "\n");
+  record("5. Read burst", readResults);
 
   console.log("=== Cleanup ===");
+  // Safety net: remove every notification this run caused (assignment pushes
+  // for test deliveries, anything addressed to a test account) so nothing from
+  // a load test is left in a real user's Notifications tab even if a delivery
+  // somehow reached a real volunteer.
+  {
+    const delSet = new Set(createdDocs.deliveries);
+    const uidSet = new Set(createdUids);
+    const notifSnap = await db.collection("notifications").where("createdAt", ">=", RUN_START_ISO).get();
+    const mine = notifSnap.docs.filter((d) => uidSet.has(d.data().uid) || delSet.has(d.data().data?.deliveryId));
+    await Promise.all(mine.map((d) => d.ref.delete()));
+    console.log("Removed " + mine.length + " notification(s) caused by this run.");
+  }
   await Promise.all(createdDocs.deliveries.map((id) => db.collection("deliveries").doc(id).delete()));
   await Promise.all(createdDocs.donations.map((id) => db.collection("donations").doc(id).delete()));
   await Promise.all(createdDocs.aidRequests.map((id) => db.collection("aidRequests").doc(id).delete()));
   await Promise.all(createdUids.map((uid) => db.collection("users").doc(uid).delete()));
   // Firebase Auth deleteUsers caps at 1000 per call, well within our count.
   await auth.deleteUsers(createdUids);
+  writeRunReport(doubleMatchedItems);
   console.log(`Deleted ${createdDocs.aidRequests.length} requests, ${createdDocs.donations.length} donations, ${createdDocs.deliveries.length} deliveries, ${createdUids.length} accounts.`);
 }
 
