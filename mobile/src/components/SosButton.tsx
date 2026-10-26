@@ -10,7 +10,9 @@ import {
   PanResponder,
   Dimensions,
   AccessibilityInfo,
+  Linking,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { apiFetch } from "../lib/api";
@@ -43,6 +45,7 @@ const TAP_DISTANCE_THRESHOLD = 6;
  * just "victim" — someone could be reporting on behalf of another person).
  */
 export function SosButton() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<SosType | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -230,6 +233,14 @@ export function SosButton() {
                 <Text className="mt-1 text-center text-sm text-gray-600">
                   An admin has been notified and will respond shortly.
                 </Text>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL("tel:117")}
+                  accessibilityRole="link"
+                  accessibilityLabel={t("sos.hotline")}
+                  className="mt-3 w-full rounded border border-red-200 bg-red-50 p-2"
+                >
+                  <Text className="text-center text-xs font-semibold text-red-800 underline">{t("sos.hotline")}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={handleClose} className="mt-4 w-full rounded bg-gray-100 py-2.5" accessibilityRole="button">
                   <Text className="text-center text-sm font-medium text-gray-700">Close</Text>
                 </TouchableOpacity>
@@ -249,6 +260,19 @@ export function SosButton() {
                 <Text className="mb-3 text-xs text-gray-500">
                   For life-safety emergencies only. This alerts admins immediately.
                 </Text>
+
+                {/* Legal/safety note: this app supplements, never replaces, the DMC
+                    hotline — shown before the user relies on it, not buried. */}
+                <View className="mb-3 rounded border border-red-200 bg-red-50 p-2">
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL("tel:117")}
+                    accessibilityRole="link"
+                    accessibilityLabel={t("sos.hotline")}
+                  >
+                    <Text className="text-xs font-semibold text-red-800 underline">{t("sos.hotline")}</Text>
+                  </TouchableOpacity>
+                  <Text className="mt-1 text-xs text-red-700">{t("sos.disclaimer")}</Text>
+                </View>
 
                 <View className="flex-row flex-wrap" style={{ gap: 8 }} accessibilityRole="radiogroup">
                   {SOS_TYPES.map(({ key, label }) => (

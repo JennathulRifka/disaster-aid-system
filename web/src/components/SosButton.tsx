@@ -108,6 +108,9 @@ export function SosButton() {
                 <p className="text-3xl" aria-hidden="true">✅</p>
                 <h3 id="sos-dialog-title" className="mt-2 text-base font-semibold text-gray-900">{t("sos.sentTitle")}</h3>
                 <p className="mt-1 text-sm text-gray-600">{t("sos.sentBody")}</p>
+                <p className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-800">
+                  <a href="tel:117" className="underline">{t("sos.hotline")}</a>
+                </p>
                 <button
                   onClick={handleClose}
                   className="mt-4 w-full rounded bg-gray-100 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
@@ -127,6 +130,15 @@ export function SosButton() {
                 </div>
 
                 <p className="mb-3 text-xs text-gray-500">{t("sos.modalSubtitle")}</p>
+
+                {/* Legal/safety note: this app supplements, never replaces, the DMC
+                    hotline — shown before the user relies on it, not buried. */}
+                <div className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+                  <p className="font-semibold">
+                    <a href="tel:117" className="underline">{t("sos.hotline")}</a>
+                  </p>
+                  <p className="mt-1 text-red-700">{t("sos.disclaimer")}</p>
+                </div>
 
                 <div className="grid grid-cols-2 gap-2" role="group" aria-label={t("sos.modalTitle")}>
                   {SOS_TYPE_KEYS.map((key) => (
