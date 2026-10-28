@@ -1,0 +1,68 @@
+{
+ "n_requests": 15000,
+ "effective_max": 90.0,
+ "share_people_capped": 0.1024,
+ "distinct_scores": 73,
+ "share_in_tied_score": 0.9998,
+ "one_at_a_time": {
+  "severity x0.5": [
+   0.829,
+   0.837
+  ],
+  "severity x0.75": [
+   0.928,
+   0.916
+  ],
+  "severity x1.25": [
+   0.945,
+   0.907
+  ],
+  "severity x1.5": [
+   0.902,
+   0.842
+  ],
+  "people x0.5": [
+   0.866,
+   0.79
+  ],
+  "people x0.75": [
+   0.936,
+   0.889
+  ],
+  "people x1.25": [
+   0.962,
+   0.912
+  ],
+  "people x1.5": [
+   0.901,
+   0.83
+  ],
+  "vulnerable x0.5": [
+   0.916,
+   0.875
+  ],
+  "vulnerable x0.75": [
+   0.938,
+   0.908
+  ],
+  "vulnerable x1.25": [
+   0.942,
+   0.905
+  ],
+  "vulnerable x1.5": [
+   0.928,
+   0.901
+  ]
+ },
+ "joint_random": {
+  "tau_median": 0.896583141183153,
+  "tau_p5": 0.8042773480789973,
+  "overlap_median": 0.8566666666666667,
+  "overlap_p5": 0.7533333333333333
+ },
+ "log_people_variant": [
+  0.783,
+  0.611,
+  0.0
+ ]
+}
