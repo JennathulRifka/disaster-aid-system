@@ -1,7 +1,7 @@
 [
   {
-    "runId": 1793039118529,
-    "at": "2026-10-26T18:26:23.146Z",
+    "runId": 1793199284311,
+    "at": "2026-10-28T14:55:34.728Z",
     "target": "https://disaster-aid-system.vercel.app",
     "doubleMatchedItems": 0,
     "phases": [
@@ -11,13 +11,13 @@
         "succeeded": 30,
         "failed": 0,
         "failureReasons": [],
-        "minMs": 1835,
-        "avgMs": 2799,
-        "sdMs": 410,
-        "p50Ms": 3001,
-        "p95Ms": 3252,
-        "p99Ms": 3315,
-        "maxMs": 3315
+        "minMs": 1213,
+        "avgMs": 2675,
+        "sdMs": 777,
+        "p50Ms": 2725,
+        "p95Ms": 3828,
+        "p99Ms": 4071,
+        "maxMs": 4071
       },
       {
         "phase": "1b. Approve requests",
@@ -25,13 +25,13 @@
         "succeeded": 30,
         "failed": 0,
         "failureReasons": [],
-        "minMs": 1218,
-        "avgMs": 1661,
-        "sdMs": 280,
-        "p50Ms": 1609,
-        "p95Ms": 2152,
-        "p99Ms": 2494,
-        "maxMs": 2494
+        "minMs": 927,
+        "avgMs": 1326,
+        "sdMs": 255,
+        "p50Ms": 1357,
+        "p95Ms": 1715,
+        "p99Ms": 1769,
+        "maxMs": 1769
       },
       {
         "phase": "2. Register donations",
@@ -39,13 +39,13 @@
         "succeeded": 30,
         "failed": 0,
         "failureReasons": [],
-        "minMs": 680,
-        "avgMs": 947,
-        "sdMs": 198,
-        "p50Ms": 942,
-        "p95Ms": 1221,
-        "p99Ms": 1225,
-        "maxMs": 1225
+        "minMs": 559,
+        "avgMs": 807,
+        "sdMs": 142,
+        "p50Ms": 782,
+        "p95Ms": 1055,
+        "p99Ms": 1067,
+        "maxMs": 1067
       },
       {
         "phase": "3. Match donations (race probe)",
@@ -53,13 +53,13 @@
         "succeeded": 30,
         "failed": 0,
         "failureReasons": [],
-        "minMs": 1778,
-        "avgMs": 2109,
-        "sdMs": 269,
-        "p50Ms": 2026,
-        "p95Ms": 2734,
-        "p99Ms": 2837,
-        "maxMs": 2837
+        "minMs": 1498,
+        "avgMs": 2471,
+        "sdMs": 1369,
+        "p50Ms": 1881,
+        "p95Ms": 5449,
+        "p99Ms": 7442,
+        "maxMs": 7442
       },
       {
         "phase": "4. Volunteers accept",
@@ -67,13 +67,13 @@
         "succeeded": 15,
         "failed": 0,
         "failureReasons": [],
-        "minMs": 850,
-        "avgMs": 1279,
-        "sdMs": 387,
-        "p50Ms": 1048,
-        "p95Ms": 1876,
-        "p99Ms": 1876,
-        "maxMs": 1876,
+        "minMs": 1277,
+        "avgMs": 1392,
+        "sdMs": 99,
+        "p50Ms": 1360,
+        "p95Ms": 1631,
+        "p99Ms": 1631,
+        "maxMs": 1631,
         "skippedRealVolunteerDeliveries": 0
       },
       {
@@ -82,106 +82,13 @@
         "succeeded": 50,
         "failed": 0,
         "failureReasons": [],
-        "minMs": 404,
-        "avgMs": 875,
-        "sdMs": 265,
-        "p50Ms": 964,
-        "p95Ms": 1233,
-        "p99Ms": 1372,
-        "maxMs": 1372
-      }
-    ]
-  },
-  {
-    "runId": 1793039273799,
-    "at": "2026-10-26T18:28:34.831Z",
-    "target": "https://disaster-aid-system.vercel.app",
-    "doubleMatchedItems": 0,
-    "phases": [
-      {
-        "phase": "1. Submit requests",
-        "total": 30,
-        "succeeded": 30,
-        "failed": 0,
-        "failureReasons": [],
-        "minMs": 776,
-        "avgMs": 1008,
-        "sdMs": 161,
-        "p50Ms": 966,
-        "p95Ms": 1326,
-        "p99Ms": 1334,
-        "maxMs": 1334
-      },
-      {
-        "phase": "1b. Approve requests",
-        "total": 30,
-        "succeeded": 30,
-        "failed": 0,
-        "failureReasons": [],
-        "minMs": 732,
-        "avgMs": 1142,
-        "sdMs": 449,
-        "p50Ms": 976,
-        "p95Ms": 2255,
-        "p99Ms": 2463,
-        "maxMs": 2463
-      },
-      {
-        "phase": "2. Register donations",
-        "total": 30,
-        "succeeded": 30,
-        "failed": 0,
-        "failureReasons": [],
-        "minMs": 472,
-        "avgMs": 786,
-        "sdMs": 546,
-        "p50Ms": 542,
-        "p95Ms": 1980,
-        "p99Ms": 2186,
-        "maxMs": 2186
-      },
-      {
-        "phase": "3. Match donations (race probe)",
-        "total": 30,
-        "succeeded": 30,
-        "failed": 0,
-        "failureReasons": [],
-        "minMs": 1115,
-        "avgMs": 1586,
-        "sdMs": 317,
-        "p50Ms": 1587,
-        "p95Ms": 2040,
-        "p99Ms": 2146,
-        "maxMs": 2146
-      },
-      {
-        "phase": "4. Volunteers accept",
-        "total": 15,
-        "succeeded": 15,
-        "failed": 0,
-        "failureReasons": [],
-        "minMs": 910,
-        "avgMs": 1298,
-        "sdMs": 157,
-        "p50Ms": 1317,
-        "p95Ms": 1486,
-        "p99Ms": 1486,
-        "maxMs": 1486,
-        "skippedRealVolunteerDeliveries": 0
-      },
-      {
-        "phase": "5. Read burst",
-        "total": 50,
-        "succeeded": 50,
-        "failed": 0,
-        "failureReasons": [],
-        "minMs": 301,
-        "avgMs": 502,
-        "sdMs": 128,
-        "p50Ms": 492,
-        "p95Ms": 690,
-        "p99Ms": 1107,
-        "maxMs": 1107
+        "minMs": 416,
+        "avgMs": 711,
+        "sdMs": 180,
+        "p50Ms": 689,
+        "p95Ms": 1010,
+        "p99Ms": 1071,
+        "maxMs": 1071
       }
     ]
   }

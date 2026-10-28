@@ -1,120 +1,120 @@
 {
-  "runCount": 2,
+  "runCount": 1,
   "doubleMatchedItemsTotal": 0,
   "phases": [
     {
       "phase": "1. Submit requests",
-      "runs": 2,
-      "requests": 60,
-      "successRate": 1,
-      "p50": {
-        "mean": 1984,
-        "sd": 1439
-      },
-      "p95": {
-        "mean": 2289,
-        "sd": 1362
-      },
-      "p99": {
-        "mean": 2325,
-        "sd": 1401
-      },
-      "max": 3315
-    },
-    {
-      "phase": "1b. Approve requests",
-      "runs": 2,
-      "requests": 60,
-      "successRate": 1,
-      "p50": {
-        "mean": 1293,
-        "sd": 448
-      },
-      "p95": {
-        "mean": 2204,
-        "sd": 73
-      },
-      "p99": {
-        "mean": 2479,
-        "sd": 22
-      },
-      "max": 2494
-    },
-    {
-      "phase": "2. Register donations",
-      "runs": 2,
-      "requests": 60,
-      "successRate": 1,
-      "p50": {
-        "mean": 742,
-        "sd": 283
-      },
-      "p95": {
-        "mean": 1601,
-        "sd": 537
-      },
-      "p99": {
-        "mean": 1706,
-        "sd": 680
-      },
-      "max": 2186
-    },
-    {
-      "phase": "3. Match donations (race probe)",
-      "runs": 2,
-      "requests": 60,
-      "successRate": 1,
-      "p50": {
-        "mean": 1807,
-        "sd": 310
-      },
-      "p95": {
-        "mean": 2387,
-        "sd": 491
-      },
-      "p99": {
-        "mean": 2492,
-        "sd": 489
-      },
-      "max": 2837
-    },
-    {
-      "phase": "4. Volunteers accept",
-      "runs": 2,
+      "runs": 1,
       "requests": 30,
       "successRate": 1,
       "p50": {
-        "mean": 1183,
-        "sd": 190
+        "mean": 2725,
+        "sd": 0
       },
       "p95": {
-        "mean": 1681,
-        "sd": 276
+        "mean": 3828,
+        "sd": 0
       },
       "p99": {
-        "mean": 1681,
-        "sd": 276
+        "mean": 4071,
+        "sd": 0
       },
-      "max": 1876
+      "max": 4071
+    },
+    {
+      "phase": "1b. Approve requests",
+      "runs": 1,
+      "requests": 30,
+      "successRate": 1,
+      "p50": {
+        "mean": 1357,
+        "sd": 0
+      },
+      "p95": {
+        "mean": 1715,
+        "sd": 0
+      },
+      "p99": {
+        "mean": 1769,
+        "sd": 0
+      },
+      "max": 1769
+    },
+    {
+      "phase": "2. Register donations",
+      "runs": 1,
+      "requests": 30,
+      "successRate": 1,
+      "p50": {
+        "mean": 782,
+        "sd": 0
+      },
+      "p95": {
+        "mean": 1055,
+        "sd": 0
+      },
+      "p99": {
+        "mean": 1067,
+        "sd": 0
+      },
+      "max": 1067
+    },
+    {
+      "phase": "3. Match donations (race probe)",
+      "runs": 1,
+      "requests": 30,
+      "successRate": 1,
+      "p50": {
+        "mean": 1881,
+        "sd": 0
+      },
+      "p95": {
+        "mean": 5449,
+        "sd": 0
+      },
+      "p99": {
+        "mean": 7442,
+        "sd": 0
+      },
+      "max": 7442
+    },
+    {
+      "phase": "4. Volunteers accept",
+      "runs": 1,
+      "requests": 15,
+      "successRate": 1,
+      "p50": {
+        "mean": 1360,
+        "sd": 0
+      },
+      "p95": {
+        "mean": 1631,
+        "sd": 0
+      },
+      "p99": {
+        "mean": 1631,
+        "sd": 0
+      },
+      "max": 1631
     },
     {
       "phase": "5. Read burst",
-      "runs": 2,
-      "requests": 100,
+      "runs": 1,
+      "requests": 50,
       "successRate": 1,
       "p50": {
-        "mean": 728,
-        "sd": 334
+        "mean": 689,
+        "sd": 0
       },
       "p95": {
-        "mean": 962,
-        "sd": 384
+        "mean": 1010,
+        "sd": 0
       },
       "p99": {
-        "mean": 1240,
-        "sd": 187
+        "mean": 1071,
+        "sd": 0
       },
-      "max": 1372
+      "max": 1071
     }
   ]
 }

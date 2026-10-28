@@ -1,15 +1,15 @@
-# Concurrent load test (deployed Vercel site): aggregate over 2 run(s)
+# Concurrent load test (deployed Vercel site): aggregate over 1 run(s)
 
-Each run creates 30 victims, 30 donors, 15 volunteers and 1 admin (real throwaway accounts), then fires each phase's requests at the same instant against the real Express + Firestore backend. Latencies are successful requests only, in milliseconds. "mean ± sd" is the mean and standard deviation of that statistic **across runs** (run-to-run variance); with n = 2 run(s) treat the sd as indicative, not a confidence interval.
+Each run creates 30 victims, 30 donors, 15 volunteers and 1 admin (real throwaway accounts), then fires each phase's requests at the same instant against the real Express + Firestore backend. Latencies are successful requests only, in milliseconds. "mean ± sd" is the mean and standard deviation of that statistic **across runs** (run-to-run variance); with n = 1 run(s) treat the sd as indicative, not a confidence interval.
 
 | Phase | Requests | Success | p50 (ms) | p95 (ms) | p99 (ms) | Worst (ms) |
 |---|---|---|---|---|---|---|
-| 1. Submit requests | 60 | 100.0% | 1984 ± 1439 | 2289 ± 1362 | 2325 ± 1401 | 3315 |
-| 1b. Approve requests | 60 | 100.0% | 1293 ± 448 | 2204 ± 73 | 2479 ± 22 | 2494 |
-| 2. Register donations | 60 | 100.0% | 742 ± 283 | 1601 ± 537 | 1706 ± 680 | 2186 |
-| 3. Match donations (race probe) | 60 | 100.0% | 1807 ± 310 | 2387 ± 491 | 2492 ± 489 | 2837 |
-| 4. Volunteers accept | 30 | 100.0% | 1183 ± 190 | 1681 ± 276 | 1681 ± 276 | 1876 |
-| 5. Read burst | 100 | 100.0% | 728 ± 334 | 962 ± 384 | 1240 ± 187 | 1372 |
+| 1. Submit requests | 30 | 100.0% | 2725 ± 0 | 3828 ± 0 | 4071 ± 0 | 4071 |
+| 1b. Approve requests | 30 | 100.0% | 1357 ± 0 | 1715 ± 0 | 1769 ± 0 | 1769 |
+| 2. Register donations | 30 | 100.0% | 782 ± 0 | 1055 ± 0 | 1067 ± 0 | 1067 |
+| 3. Match donations (race probe) | 30 | 100.0% | 1881 ± 0 | 5449 ± 0 | 7442 ± 0 | 7442 |
+| 4. Volunteers accept | 15 | 100.0% | 1360 ± 0 | 1631 ± 0 | 1631 ± 0 | 1631 |
+| 5. Read burst | 50 | 100.0% | 689 ± 0 | 1010 ± 0 | 1071 ± 0 | 1071 |
 
 Double-matched request items across all runs: **0** (race-condition probe, Phase 3; matching now runs inside a Firestore transaction).
 
