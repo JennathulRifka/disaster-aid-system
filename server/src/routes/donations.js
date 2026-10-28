@@ -3,6 +3,7 @@ const { db } = require("../config/firebase");
 const { requireAuth, requireRole } = require("../middleware/authMiddleware");
 const { getCategoryLimits } = require("../utils/categories");
 const { computeOverallStatus } = require("../utils/requestItemStatus");
+const { planMatch } = require("../utils/partialMatch");
 const { distanceKm } = require("../utils/geo");
 const { nearestDistrict } = require("../utils/districts");
 const { logAction } = require("../utils/auditLog");
@@ -224,13 +225,14 @@ router.get("/mine", requireAuth, requireRole("donor"), async (req, res) => {
  * { ok: false, reason: "taken" } if the request/item is no longer eligible,
  * else { ok: true, consumedQuantity, remainingAfter }.
  *
- * The request-side item is still all-or-nothing on purpose (deferred,
- * confirmed scope — see "Donation leftover-quantity tracking" in CLAUDE.md):
- * the item is marked fully "matched" regardless of whether this donation can
- * cover its full quantity. Only the DONATION's own balance is quantity-aware:
- * never consume more than it has left or than the item needs; the rest stays
- * as remainingQuantity and the donation stays "available" so it can be matched
- * again later for a different request.
+ * Quantity-aware on BOTH sides. Never consume more than the donation has left
+ * or than the item needs. If the donation covers only part of the item (e.g.
+ * the request needs 50 L and this donation has 20 L), the item is SPLIT into a
+ * matched part (20 L, status "matched", linked to this donation) and a pending
+ * remainder (30 L, status "pending") that stays eligible for another donation —
+ * the shortfall is never silently dropped. If the donation has more than the
+ * item needs, the item is matched whole and the donation's leftover stays
+ * "available" so it can serve a different request.
  *
  * The delivery/chat/notification side effects stay outside the transaction
  * (they're not contended and Firestore transactions must not do slow,
@@ -247,22 +249,13 @@ async function claimMatch(donationRef, requestId, category, donationId, now) {
     if (remainingBefore <= 0) return { ok: false, reason: "depleted" };
 
     const request = requestSnap.exists ? requestSnap.data() : null;
-    const matchedItem = request?.items?.find((item) => item.category === category && item.status === "pending");
-    if (!request || !REQUESTABLE_STATUSES.includes(request.status) || !matchedItem) {
-      return { ok: false, reason: "taken" };
-    }
+    if (!request || !REQUESTABLE_STATUSES.includes(request.status)) return { ok: false, reason: "taken" };
 
-    const updatedItems = request.items.map((item) =>
-      item === matchedItem ? { ...item, status: "matched", donationId } : item
-    );
-
-    const neededByItem = Number(matchedItem.quantity) || remainingBefore;
-    const consumedQuantity = Math.min(remainingBefore, neededByItem);
-    // A legacy donation with no tracked quantity at all (remainingBefore is
-    // Infinity) has no real balance to carry forward — treat it as single-use
-    // (fully consumed by this match) rather than persisting Infinity, which
-    // poisons every district-inventory total it's counted in.
-    const remainingAfter = Number.isFinite(remainingBefore) ? remainingBefore - consumedQuantity : 0;
+    // All the quantity/splitting arithmetic lives in utils/partialMatch.js
+    // (pure, unit-tested). null = no pending item left in this category.
+    const plan = planMatch(request.items, category, remainingBefore, donationId);
+    if (!plan) return { ok: false, reason: "taken" };
+    const { updatedItems, consumedQuantity, remainingAfter, outstandingQuantity } = plan;
 
     tx.update(requestRef, {
       items: updatedItems,
@@ -276,7 +269,7 @@ async function claimMatch(donationRef, requestId, category, donationId, now) {
       updatedAt: now,
     });
 
-    return { ok: true, consumedQuantity, remainingAfter };
+    return { ok: true, consumedQuantity, remainingAfter, outstandingQuantity };
   });
 }
 
@@ -358,7 +351,7 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
         .status(409)
         .json({ error: "Every waiting request for this category was just matched by someone else. Try again." });
     }
-    const { consumedQuantity, remainingAfter } = claim;
+    const { consumedQuantity, remainingAfter, outstandingQuantity } = claim;
 
     const donationUpdate = {
       status: remainingAfter > 0 ? "available" : "matched",
@@ -473,6 +466,7 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
       deliveryId,
       consumedQuantity,
       remainingQuantity: remainingAfter,
+      outstandingQuantity,
     });
 
     return res.json({
@@ -484,6 +478,7 @@ router.post("/:id/match", requireAuth, requireRole("admin"), async (req, res) =>
       autoAssignedVolunteer,
       consumedQuantity,
       remainingQuantity: remainingAfter,
+      outstandingQuantity, // >0 = the request item was only partly covered; the rest is still pending
     });
   } catch (err) {
     logger.error({ err }, "Match donation error");

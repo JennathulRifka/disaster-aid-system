@@ -128,8 +128,8 @@ export function AidRequestsScreen() {
               </View>
 
               <View className="mt-2 flex-row flex-wrap" style={{ gap: 4 }}>
-                {(r.items || []).map((item) => (
-                  <View key={item.category} className="rounded border border-gray-200 px-2 py-0.5">
+                {(r.items || []).map((item, itemIndex) => (
+                  <View key={`${item.category}-${itemIndex}`} className="rounded border border-gray-200 px-2 py-0.5">
                     <Text className="text-xs capitalize text-gray-600">
                       {item.category.replace("_", " ")} ×{item.quantity}
                     </Text>

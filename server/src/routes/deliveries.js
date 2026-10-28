@@ -463,16 +463,32 @@ router.post("/:id/confirm", requireAuth, requireRole("victim"), async (req, res)
 
     const now = new Date().toISOString();
     const requestData = requestDoc.data();
-    const updatedItems = requestData.items.map((item) =>
-      item.category === delivery.category && item.donationId === delivery.donationId
-        ? { ...item, status: "delivered" }
-        : item
-    );
+    // A request item can now be split (partial coverage), and the same donation
+    // can serve two items of one request — so flip only the FIRST not-yet-
+    // delivered item for this delivery, not every item sharing the donationId.
+    let flipped = false;
+    const updatedItems = requestData.items.map((item) => {
+      if (
+        !flipped &&
+        item.category === delivery.category &&
+        item.donationId === delivery.donationId &&
+        item.status !== "delivered"
+      ) {
+        flipped = true;
+        return { ...item, status: "delivered" };
+      }
+      return item;
+    });
     const newRequestStatus = computeOverallStatus(updatedItems);
 
     await ref.update({ status: "confirmed", updatedAt: now });
     await requestRef.update({ items: updatedItems, status: newRequestStatus, updatedAt: now });
-    await db.collection("donations").doc(delivery.donationId).update({ status: "delivered", updatedAt: now });
+    // Only close the donation once it is fully used up — a donation with a
+    // leftover balance stays "available" so it can still be matched elsewhere.
+    const donationRefForConfirm = db.collection("donations").doc(delivery.donationId);
+    const donationAfter = await donationRefForConfirm.get();
+    const hasLeftover = (donationAfter.data()?.remainingQuantity ?? 0) > 0;
+    await donationRefForConfirm.update(hasLeftover ? { updatedAt: now } : { status: "delivered", updatedAt: now });
     await lockChatsForDelivery(req.params.id);
 
     return res.json({ id: req.params.id, status: "confirmed", requestStatus: newRequestStatus });

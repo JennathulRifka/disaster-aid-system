@@ -151,13 +151,13 @@ export function MyRequestsScreen() {
                   </View>
 
                   <View className="mt-3 border-t border-gray-100">
-                    {(r.items || []).map((item) => {
+                    {(r.items || []).map((item, itemIndex) => {
                       const delivery = requestDeliveries.find(
                         (d) => d.category === item.category && d.donationId === item.donationId
                       );
                       return (
                         <View
-                          key={item.category}
+                          key={`${item.category}-${itemIndex}`}
                           className="flex-row items-center justify-between border-b border-gray-100 py-2"
                         >
                           <View>

@@ -128,9 +128,9 @@ function RequestsTable({
                 <td className="px-4 py-3 capitalize">{r.disasterType}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {(r.items || []).map((item) => (
+                    {(r.items || []).map((item, itemIndex) => (
                       <span
-                        key={item.category}
+                        key={`${item.category}-${itemIndex}`}
                         className="rounded border border-gray-200 px-2 py-0.5 text-xs capitalize text-gray-600"
                       >
                         {item.category.replace("_", " ")} ×{item.quantity}

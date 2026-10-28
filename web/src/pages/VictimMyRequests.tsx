@@ -138,12 +138,12 @@ export default function VictimMyRequests() {
                 </div>
 
                 <div className="mt-3 divide-y divide-gray-100 border-t border-gray-100">
-                  {(r.items || []).map((item) => {
+                  {(r.items || []).map((item, itemIndex) => {
                     const delivery = requestDeliveries.find(
                       (d) => d.category === item.category && d.donationId === item.donationId
                     );
                     return (
-                      <div key={item.category} className="flex items-center justify-between py-2">
+                      <div key={`${item.category}-${itemIndex}`} className="flex items-center justify-between py-2">
                         <span className="text-sm capitalize text-gray-700">
                           {t(`categories.${item.category}`, item.category)} ×{item.quantity}
                         </span>
